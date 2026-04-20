@@ -107,25 +107,25 @@ RELEASE_CHECKLIST.md
 
 ## 快速开始
 
-发布到 GitHub 后，推荐直接用 skills CLI 安装。
+推荐直接用 skills CLI 全局安装。
 
 安装 `buaa-classroom-summarizer`：
 
 ```bash
-npx skills add <owner>/<repo> --skill buaa-classroom-summarizer
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill buaa-classroom-summarizer --yes --global
 ```
 
 安装 `obsidian-course-vault`：
 
 ```bash
-npx skills add <owner>/<repo> --skill obsidian-course-vault
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-course-vault --yes --global
 ```
 
-如果你的仓库地址已经确定，也可以直接写成完整 GitHub URL：
+如果只想安装到当前项目，可以去掉 `--global`：
 
 ```bash
-npx skills add https://github.com/<owner>/<repo> --skill buaa-classroom-summarizer
-npx skills add https://github.com/<owner>/<repo> --skill obsidian-course-vault
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill buaa-classroom-summarizer --yes
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-course-vault --yes
 ```
 
 安装后再分别补依赖，并阅读各自 `SKILL.md`。详细说明见 [INSTALL.md](INSTALL.md)。
@@ -157,4 +157,4 @@ npx skills add https://github.com/<owner>/<repo> --skill obsidian-course-vault
 
 - 仓库使用 `MIT` 许可证。
 - 当前推荐以 `public beta` 心态使用，而不是把它当成完全无监督的稳定产品。
-- 发布到公开 GitHub 仓库后，用户可以通过 `npx skills add ...` 安装。
+- 用户可以通过上面的 `npx skills add ...` 命令直接安装。

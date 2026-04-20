@@ -5,7 +5,7 @@
 - 保持 `public beta`
 - 正式支持入口只写 `livingroom` 和 `coursedetail`
 - 不把 `SPoC notice` 当正式能力宣传
-- 安装方式以 `npx skills add <owner>/<repo> --skill <skill-name>` 为主
+- 安装方式以 `npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill <skill-name> --yes --global` 为主
 
 ## 发布前你最好再亲自确认一次
 

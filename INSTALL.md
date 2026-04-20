@@ -4,18 +4,18 @@
 
 ## 安装命令
 
-发布到 GitHub 后，使用：
+推荐全局安装：
 
 ```bash
-npx skills add <owner>/<repo> --skill buaa-classroom-summarizer
-npx skills add <owner>/<repo> --skill obsidian-course-vault
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill buaa-classroom-summarizer --yes --global
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-course-vault --yes --global
 ```
 
-如果你更习惯写完整仓库地址，也可以用：
+如果只想安装到当前项目，可以去掉 `--global`：
 
 ```bash
-npx skills add https://github.com/<owner>/<repo> --skill buaa-classroom-summarizer
-npx skills add https://github.com/<owner>/<repo> --skill obsidian-course-vault
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill buaa-classroom-summarizer --yes
+npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-course-vault --yes
 ```
 
 安装完成后，Codex / Claude Code 会把 skill 放到各自的用户技能目录中。
