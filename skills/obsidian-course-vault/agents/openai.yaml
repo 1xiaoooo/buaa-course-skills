@@ -1,0 +1,7 @@
+interface:
+  display_name: "Obsidian Course Vault"
+  short_description: "把课程回放沉淀成 Obsidian 课程库"
+  default_prompt: "Use $obsidian-course-vault to turn course replay artifacts into an Obsidian course vault."
+
+policy:
+  allow_implicit_invocation: true

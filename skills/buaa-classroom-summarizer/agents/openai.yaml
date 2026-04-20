@@ -1,0 +1,7 @@
+interface:
+  display_name: "BUAA Classroom Summarizer"
+  short_description: "抽取北航课堂回放并整理课程转写"
+  default_prompt: "Use $buaa-classroom-summarizer to extract BUAA classroom replay artifacts and build a standalone course note."
+
+policy:
+  allow_implicit_invocation: true

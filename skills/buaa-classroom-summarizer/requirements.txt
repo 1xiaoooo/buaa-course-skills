@@ -1,0 +1,9 @@
+requests>=2.31.0
+imageio-ffmpeg>=0.5.1
+pycryptodomex>=3.20.0
+numpy>=1.26.0
+Pillow>=10.0.0
+rapidocr-onnxruntime>=1.3.24
+playwright>=1.50.0
+# Windows-only optional dependency for direct Chromium cookie decryption.
+pywin32>=308; platform_system == "Windows"
