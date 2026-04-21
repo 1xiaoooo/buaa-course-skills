@@ -1,99 +1,81 @@
 # BUAA Course Skills
 
-面向北航课程场景的 `public beta` 技能仓库，用来把课堂回放、课程转写和课次元信息，整理成可复用的学习资料。
+把 BUAA 课堂回放、课程转写和课次元信息，整理成**可检索、可回看、可复用**的课程学习资料。  
+它既可以生成单次课程纪要，也可以继续沉淀到 Obsidian，形成长期维护的课程知识库。
 
-如果你属于下面这类人，这个仓库大概率会有用：
+## 这个仓库解决什么问题
 
-- 想系统复盘一门课，而不是只看单节回放
-- 上课跟得不稳定，但又不想完全掉队
-- 想快速知道老师这节课讲了什么、强调了什么、布置了什么
-- 希望把一门课长期整理成自己的知识库，而不是只留一堆零散转写
-- 已经在用 Obsidian，想把课程笔记、概念页和图谱结构一起长出来
+课堂回放通常能播放，但不容易真正用于复习：
 
-总结：适合喜欢自学但是又想知道老师上课都讲到了什么内容的同学，它可以告诉你课堂上发生什么了，以及归纳老师提到的作业/考试信息。
+- 过几周后，很难快速回忆某一节课到底讲了什么
+- 想回看某个知识点时，不知道应该从哪一段开始
+- 老师提到的作业、考试、练习和提醒，分散在整节课里
+- 一学期结束后，留下的往往是一堆零散转写，而不是结构化课程资料
 
-这个仓库当前包含两个 skill：
+这个仓库的目标，是把“能播放的课堂回放”变成“可以长期复用的学习资料”。
 
-- `buaa-classroom-summarizer`
-  从 BUAA `livingroom` 或 `coursedetail` 页面提取结构化回放原料。
-- `obsidian-course-vault`
-  把这些原料整理进 Obsidian，维护课次页、概念页、图谱 hub、课程总览和回放同步页。
+## 仓库包含两个 skill
 
-它们可以单独使用，也可以串起来使用：
+### `buaa-classroom-summarizer`
 
-- 只想拿到课程转写、元信息、回放索引和独立 Markdown 纪要：用 `buaa-classroom-summarizer`
-- 想把一门课长期沉淀成 Obsidian 知识库：再加 `obsidian-course-vault`
+从 BUAA `livingroom` 或 `coursedetail` 页面提取结构化回放原料，并生成单次课程纪要。
 
-## 它具体能帮你省掉什么
+适合你想要：
 
-正常情况下，我们面对课堂回放时最烦的几件事是：
+- 枚举可回放课次
+- 提取课程转写和元信息
+- 导出独立 Markdown 纪要
+- 快速知道这节课讲了什么、强调了什么、布置了什么
 
-- 点进回放后找不到自己需要回看的片段
-- 过几周后再回看时，已经不记得这节课和前后课是什么关系
+### `obsidian-course-vault`
 
-这套仓库的目标，就是把这几步尽量收成一条稳定工作流：
+把课程原料和课次纪要整理进 Obsidian，维护课程总览、课次页、概念页和图谱 hub。
 
-- 先把回放原料抽出来
-- 再基于课程转写整理成正式课次笔记
-- 最后把概念页、图谱 hub 和课程总览一起维护起来
+适合你想要：
 
-## 适合谁
+- 持续维护一门课的知识库
+- 把单节课笔记逐渐长成课程体系
+- 在 Obsidian 中建立概念页、图谱入口和课程总览
 
-最适合的用户通常是：
+## 典型工作流
 
-- 想自学或系统复盘课程的人
-- 想快速了解某节课课堂上发生了什么的人
-- 想把一学期课程逐渐沉淀成自己的知识体系的人
-- 希望把“能播放的课堂回放”变成“可检索、可回看、可复用的学习资料”的人
+1. 从 BUAA 课堂页面提取回放、转写和课次元信息  
+2. 生成单次课程纪要或语义重建 packet  
+3. 将结果同步到 Obsidian  
+4. 持续维护课次页、概念页、图谱 hub 和课程总览
 
-## 不太适合谁
+两个 skill 可以单独使用，也可以串联使用。
 
-这套仓库目前不太适合下面这类需求：
+## 你最终会得到什么
 
-- 想完全零介入、一键得到完美课堂笔记的人
+使用 `buaa-classroom-summarizer` 时，典型输出包括：
 
-## 为什么值得装
+- 一份按课次组织的 Markdown 纪要
+- 本节主线总结
+- 带时间戳的内容时间轴
+- 关键概念整理
+- 课程事务 / 作业 / 待核对信息
+- 面向复习的回看建议
 
-如果你已经习惯把知识真正沉淀下来，这两个 skill 的价值主要在这里：
+如果再配合 `obsidian-course-vault`，还可以继续维护：
 
-- 它不会只给你一份一次性的摘要，而是能把一门课慢慢整理成体系
-- 它能把原始回放、课程转写、课次纪要、概念页和课程图谱串起来
+- 课程总览页
+- 单次课次页
+- 概念页
+- 课程图谱 hub
+- 回放同步页
 
-## 正式支持的入口
+## 正式支持的输入入口
 
-当前正式支持的输入有：
+当前正式支持：
 
 - `classroom.msa.buaa.edu.cn/livingroom`
 - `classroom.msa.buaa.edu.cn/coursedetail`
 
-## 当前适合什么场景
-
-已经比较稳的部分：
-
-- BUAA 课堂回放抽取
-- 转写优先的结构化诊断
-- 独立 Markdown 纪要导出
-- Obsidian 课程库维护、课次页维护、概念页维护和图谱入口维护
-
-仍然属于 beta 的部分：
-
-- 跨平台实机验证还不完整
-- 非 Windows 环境更推荐 runtime browser auth
-- 最终纪要质量仍会受到课程转写质量和课程结构影响
-
-## 仓库结构
-
-```text
-skills/
-  buaa-classroom-summarizer/
-  obsidian-course-vault/
-INSTALL.md
-RELEASE_CHECKLIST.md
-```
-
 ## 快速开始
 
-推荐直接用 skills CLI 全局安装。
+第一次使用，建议先安装 `buaa-classroom-summarizer`。  
+只有当你希望长期维护 Obsidian 课程库时，再加装 `obsidian-course-vault`。
 
 安装 `buaa-classroom-summarizer`：
 
@@ -114,7 +96,7 @@ npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill buaa-class
 npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-course-vault --yes
 ```
 
-安装后再分别补依赖，并阅读各自 `SKILL.md`。详细说明见 [INSTALL.md](INSTALL.md)。
+安装完成后，请分别补充依赖，并阅读各自的 `SKILL.md`。详细说明见 [INSTALL.md](INSTALL.md)。
 
 ## 推荐用法
 
@@ -139,8 +121,46 @@ npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-c
 - 可读的图谱 hub 和课程总览
 - 一学期持续同步和整理回放
 
+## 适合的使用场景
+
+- 想系统复盘一门课，而不是只看单节回放
+- 想快速了解某节课课堂上发生了什么
+- 想把课程资料逐渐沉淀为自己的知识体系
+- 已经在使用 Obsidian，希望把课程资料结构化维护起来
+
+## 当前不太适合的场景
+
+- 希望完全零介入、一键得到完美课堂笔记
+- 希望在任何课程、任何平台上直接无适配使用
+- 希望在转写质量较差的情况下仍然稳定得到高质量结果
+
+## 当前状态
+
+当前仓库处于 `public beta` 阶段，已经比较稳的部分包括：
+
+- BUAA 课堂回放抽取
+- 转写优先的结构化诊断
+- 独立 Markdown 纪要导出
+- Obsidian 课程库、课次页、概念页与图谱入口维护
+
+仍需持续验证和打磨的部分包括：
+
+- 跨平台实机验证
+- 非 Windows 环境下的认证与运行细节
+- 受原始 ASR / 转写质量影响较大的课程整理效果
+
+## 仓库结构
+
+```text
+skills/
+  buaa-classroom-summarizer/
+  obsidian-course-vault/
+INSTALL.md
+RELEASE_CHECKLIST.md
+```
+
 ## 发布说明
 
-- 仓库使用 `MIT` 许可证。
-- 当前推荐以 `public beta` 心态使用，而不是把它当成完全无监督的稳定产品。
-- 用户可以通过上面的 `npx skills add ...` 命令直接安装。
+- License: `MIT`
+- 当前推荐以 `public beta` 的预期使用，而不是视为完全无监督的稳定产品
+- 用户可以通过上面的 `npx skills add ...` 命令直接安装
