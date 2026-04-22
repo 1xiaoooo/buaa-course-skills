@@ -33,8 +33,11 @@ try:
 except ImportError:
     win32crypt = None
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from validate_final_note import validate_markdown_text
+
 PPT_OUTLINE_SCRIPT = SCRIPT_DIR / "extract_ppt_outline.py"
 SESSION_CACHE = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "cache" / "buaa_browser_session.json"
 RUNTIME_BROWSER_PROFILE = (
@@ -156,8 +159,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--markdown-note-mode",
         choices=["final", "final-lite", "final-explained"],
-        default="final",
-        help="Standalone Markdown note mode. Semantic modes also generate a compact semantic rebuild packet for agent rewriting.",
+        default="final-explained",
+        help="Standalone Markdown note mode. All final modes generate a semantic rebuild packet; scripts no longer write final prose directly.",
     )
     parser.add_argument(
         "--lightweight-teacher-review",
@@ -761,11 +764,23 @@ def transcript_lines_in_range(
 
 
 def transcript_overview_payload(transcript_segments: list[dict[str, Any]]) -> dict[str, Any]:
-    lines = [clean_transcript_line(item.get("text", "")) for item in transcript_segments]
-    lines = [line for line in lines if line]
+    first_sec = 0.0
+    last_sec = 0.0
+    for item in transcript_segments:
+        try:
+            begin_sec = float(item.get("begin_sec") or 0)
+            end_sec = float(item.get("end_sec") or begin_sec)
+        except (TypeError, ValueError):
+            begin_sec = 0.0
+            end_sec = 0.0
+        if first_sec == 0.0 and begin_sec > 0:
+            first_sec = begin_sec
+        last_sec = max(last_sec, begin_sec, end_sec)
     return {
         "segment_count": len(transcript_segments),
-        "sample_lines": unique_keep_order(lines)[:8],
+        "first_sec": round(first_sec, 2),
+        "last_sec": round(last_sec, 2),
+        "evidence_policy": "Read transcript.txt for semantic reconstruction; do not quote packet evidence into final notes.",
     }
 
 
@@ -1041,7 +1056,6 @@ def build_transcript_fallback_sections(transcript_segments: list[dict[str, Any]]
                 "end_sec": end_sec,
                 "headings": [title],
                 "points": [],
-                "sample_lines": unique_keep_order(lines)[:3],
             }
         )
     return sections
@@ -1234,6 +1248,15 @@ def build_semantic_rebuild_prompt(mode: str) -> str:
             "- 不要让 PPT 决定 section 边界、主线、概念提取或课次完成状态。",
             "- 不要把 OCR 碎句或 ASR 噪声原样抄进正文。",
             "- 主线和内容纪要要像人类学生整理后的课程纪要，而不是关键词拼接。",
+            "- 你是在写面向学生的完成稿，不是在写 seed note、诊断稿或给后续整理者看的说明。",
+            "- `sections` 只是时间窗，不是正文提纲；不要照抄其中的标题、证据策略或内部字段。",
+            "- 必须先读取 `references.transcript` 指向的完整转写，再写最终纪要。",
+            "- 最终 Markdown 不得出现 `代表性表达`、`转写里比较能代表`、`转写分段`、`课堂讲解与主题推进`、`整理时建议` 等中间产物痕迹。",
+            "- 每个主要时间段都要说明真实教学动作：定义、模型、论证、证明、例子、比较、案例讨论、政策解释、教师点评、作业、考试安排或课堂事务。",
+            "- 必须捕捉高价值课堂信号：考试、作业、截止时间、提交格式、成绩占比、阅读要求、老师反复强调的重点、易错点、公式、定理、定义和例子。",
+            "- 如果老师明确说某内容重要、可能考试、容易混淆、经常出错或课后需要复习，应保留在正文或 `待核对` 中。",
+            "- 如果证据不足，把事项放进 `待核对`；不要把弱证据改写成确定结论。",
+            "- 先判断课程领域，再选择表达方式：数学/统计重建对象、假设、公式、定理、证明思路和例子；工科/计算机重建系统、算法、约束、步骤、实验和权衡；文科/社科/思政重建概念、论点、背景、材料、案例和教师评价重点；实验/项目课重建任务、工具、交付物、操作步骤和评分要求。",
             "- 如果 `has_ppt_outline=false`，不要套用通用课程模板标题；应根据 `sections`、`transcript_overview`、各段课程转写片段和课程上下文自行归纳 3 到 6 个真实主题。",
             "- `内容纪要` 的每个分段都必须保留时间轴。优先沿用 packet 里已有的 `time_range`；如果时间只适合写成粗粒度区间，也要保留“时间参考：约 `MM:SS-MM:SS`”或同等清晰的时间标记。",
             "- 不要预设这门课属于统计、数学、工科或文科中的任何一类，先判断课程域，再写正文。",
@@ -1696,9 +1719,7 @@ def build_markdown_note(
                     "start_sec": float(section.get("start_sec", 0)),
                     "end_sec": float(section.get("end_sec", 0)),
                     "time_range": f"{start_text}-{end_text}" if start_text and end_text else start_text or end_text or "",
-                    "seed_bullets": section_bullets,
-                    "transcript_excerpt": transcript_lines[:6],
-                    "sample_lines": list(section.get("sample_lines", [])),
+                    "evidence_policy": "Use this only as a time window. Read transcript.txt before writing; do not quote raw ASR snippets.",
                 }
             )
     else:
@@ -1822,10 +1843,11 @@ def export_markdown_note(
     note_path: Path,
     mode: str,
 ) -> dict[str, Any]:
-    body, semantic_artifacts = build_markdown_note(output_dir, metadata, transcript_segments, transcript_text, mode)
+    packet_mode = "final-explained" if mode == "final" else mode
+    body, semantic_artifacts = build_markdown_note(output_dir, metadata, transcript_segments, transcript_text, packet_mode)
     coverage = metadata.get("transcript_coverage", {}) if isinstance(metadata, dict) else {}
     diagnostic = bool(isinstance(coverage, dict) and coverage.get("insufficient"))
-    if mode in {"final-lite", "final-explained"}:
+    if mode in {"final", "final-lite", "final-explained"}:
         if note_path.exists():
             note_path.unlink()
         return {
@@ -1834,6 +1856,18 @@ def export_markdown_note(
             "markdown_note_mode": mode,
             "has_semantic_rebuild_packet": bool(semantic_artifacts),
             "semantic_rebuild_input": semantic_artifacts.get("input_path", ""),
+            "quality_gate": "final_note_must_be_written_by_agent_and_pass_validate_final_note",
+            "transcript_coverage": coverage,
+        }
+    quality_issues = validate_markdown_text(body)
+    if quality_issues:
+        if note_path.exists():
+            note_path.unlink()
+        return {
+            "status": "blocked_by_quality_gate",
+            "note_path": str(note_path),
+            "markdown_note_mode": mode,
+            "quality_issues": quality_issues,
             "transcript_coverage": coverage,
         }
     write_text(note_path, body)

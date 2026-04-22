@@ -53,7 +53,7 @@ Downstream note logic must consume this diagnosis instead of recomputing route d
 
 ## Standalone Markdown Note Workflow
 
-Create a deterministic seed note:
+Prepare a semantic rebuild packet:
 
 ```powershell
 python scripts\extract_buaa_classroom.py "<livingroom-url>" --output-dir "<output-dir>" --export-markdown-note
@@ -71,7 +71,23 @@ These modes must write only:
 - `semantic_rebuild/semantic_rebuild_input.json`
 - `semantic_rebuild/semantic_rebuild_prompt.md`
 
-Do not emit `lesson_note.md` in semantic modes by default. Treat the packet as the only intermediate artifact, then let the agent produce the final note.
+All final-oriented modes, including legacy `final`, must write only the semantic packet. Do not emit `lesson_note.md` by default. Treat the packet as the only intermediate artifact, then let the agent produce the final note.
+
+Before accepting an agent-written note as final, run:
+
+```powershell
+python scripts\validate_final_note.py "<final-note.md>"
+```
+
+If the validator fails, keep the extraction artifacts and semantic packet only. Do not rename or present the failed note as a final note.
+
+Then create a reviewer packet:
+
+```powershell
+python scripts\review_final_note.py --note "<final-note.md>" --semantic-input "<semantic_rebuild_input.json>" --output-dir "<review-dir>"
+```
+
+Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent when the environment supports subagents. In environments without subagents, run a separate reviewer pass with the same prompt. The reviewer must not edit the note during review.
 
 When the agent writes the final standalone Markdown note:
 
@@ -82,6 +98,8 @@ When the agent writes the final standalone Markdown note:
 - keep extraction artifacts such as `metadata.json`, `transcript.json`, and semantic rebuild packets in their original replay output directories; only user-facing final Markdown notes need the course-folder layout
 - start directly with the lesson title and content
 - do not show production metadata such as `状态`, `来源`, transcript coverage, replay diagnosis, or PPT extraction status in the user-facing note
+- pass `scripts\validate_final_note.py` before the note is called final
+- pass the reviewer gate for the current file hash before the note is called final
 
 ## Batch Finalization Rule
 
@@ -107,6 +125,25 @@ A user-facing final note must be a semantic reconstruction, not a decorated tran
 
 If a note fails this gate, keep only the extraction artifacts and semantic packet, then mark the lesson as needing semantic rebuild. Do not call it final.
 
+The semantic packet must not contain user-facing seed prose such as `seed_bullets`, raw `sample_lines`, or `transcript_excerpt`. It may contain time windows and paths to the transcript; the agent must read the transcript itself and reconstruct the note semantically.
+
+## Reviewer Gate
+
+Finalization requires both gates on the current Markdown bytes:
+
+- `scripts\validate_final_note.py` passes.
+- The independent reviewer returns `decision=pass`, `finalization_allowed=true`, and `reviewed_note_sha256` equal to `final_note_review_input.json` `note.sha256`.
+
+If the note changes after either gate, both gate results are invalid and must be rerun.
+
+Reviewer decisions:
+
+- `pass`: the note faithfully covers the transcript, handles course-domain substance, preserves supported affairs/emphasis, and is safe to present as final.
+- `needs_revision`: the transcript can support a final note, but the current note misses supported content, is too generic, or needs correction. Revise, rerun hard gate, then rerun reviewer.
+- `reject`: the current source material or note is not fit for finalization. Keep extraction artifacts and semantic packet; do not present a final note.
+
+Absence is not failure. Missing homework, exam, grading, or deadline information is only a problem when the transcript contains evidence for it and the note omits, distorts, or invents it. If the transcript shows early dismissal, in-class exercise, student presentation, discussion, or a logistics-only class, the note may be short but must faithfully describe what happened.
+
 ## Semantic Rebuild Rules
 
 - Perform a course-alignment check before accepting the rewrite as final.
@@ -115,7 +152,29 @@ If a note fails this gate, keep only the extraction artifacts and semantic packe
 - Keep math as `$...$` or `$$...$$` only. Do not wrap formulas in backticks.
 - Treat the course transcript as the only primary source for section boundaries, lesson mainline, and completion checks.
 - Only mark a lesson final when course-transcript coverage and summary coverage both pass.
-- For math-heavy courses, reconstruct the actual mathematical objects, assumptions, equations, proof ideas, and examples. Do not substitute generic learning advice for missing semantic understanding.
+- Reconstruct course-specific substance. Do not substitute generic learning advice for missing semantic understanding.
+
+## Authoring Contract
+
+When writing the final student-facing Markdown note from a semantic packet:
+
+- You are writing the finished note, not a seed note, diagnostic note, or instruction to a future organizer.
+- Read the full `transcript.txt` before writing. Use `semantic_rebuild_input.json` only as metadata, time anchors, and artifact index.
+- Do not expose evidence snippets, candidate phrases, OCR fragments, raw ASR lines, or internal workflow notes.
+- Every major time block should explain what teaching move happened: definition, model, argument, proof, example, comparison, case discussion, policy explanation, teacher comment, assignment, exam arrangement, or class logistics.
+- Capture high-value classroom signals: exams, homework, deadlines, submission format, grading weight, reading requirements, teacher-emphasized key points, repeatedly stressed phrases, formulas, theorems, definitions, examples, and common mistakes.
+- If the teacher explicitly says something is important, likely to be tested, easy to confuse, often wrong, or needs review after class, preserve it in the note.
+- If transcript evidence is weak, write the item under `待核对` instead of turning it into a confident conclusion.
+- The final note must face the student reader directly. Avoid phrases such as “整理时应...”, “后续重写...”, “这一段主要在...”, or other process commentary.
+
+Course-domain reconstruction guidance:
+
+- Math and statistics: reconstruct objects, definitions, assumptions, equations, theorems, proof ideas, examples, counterexamples, symbol meanings, and links between results.
+- Engineering and computer science: reconstruct system components, algorithms, design constraints, implementation steps, experiment setup, failure cases, trade-offs, and how formulas or code relate to the design.
+- Humanities and social sciences: reconstruct concepts, arguments, historical or institutional background, author positions, evidence, comparisons, cases, and the teacher's evaluative emphasis.
+- Ideological and political courses: reconstruct policy concepts, theoretical claims, historical context, named documents or events, value judgments, exam-oriented formulations, and examples used to explain abstract claims.
+- Language, writing, and communication courses: reconstruct vocabulary, rhetorical patterns, text structure, examples, correction points, practice requirements, and teacher feedback.
+- Lab, design, or project courses: reconstruct task goals, deliverables, tools, operation steps, data requirements, safety or format constraints, grading criteria, and troubleshooting advice.
 
 ## Transcript-Only Rule
 
