@@ -79,6 +79,19 @@ For semantic modes:
 
 If semantic rebuild is still pending, do not count the lesson as finished in course trackers.
 
+## Final Note Quality Gate
+
+Do not write or count a lesson as finished if the note is only a decorated transcript segment list. Reject the note and keep it as `needs_review` if it contains:
+
+- raw ASR/OCR snippets presented as "代表性表达" or representative lines
+- headings such as `课堂讲解与主题推进 1`
+- repeated generic advice like `整理时建议不要把这一段只当作...`
+- section bodies that could fit almost any course
+- misrecognized mathematical symbols copied into final prose without correction
+- a course tracker or overview marking diagnostics or weak drafts as formal notes
+
+For math-heavy courses, the final note must reconstruct concrete mathematical objects, assumptions, equations, proof ideas, examples, and their relationships. If the agent cannot do that from the transcript, write a review-gated draft rather than a formal lesson page.
+
 ## Course Alignment Rules
 
 Before accepting a semantic rewrite, judge whether the replay interpretation is:
@@ -139,5 +152,6 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 - Keep graph-growth rules internal to the semantic packet. Do not expose helper rule notes as vault content.
 - Keep course pages concept-centric. Lesson pages support the graph; they should not become the graph itself.
 - Grow concept pages from transcript-stable concepts only. Do not let PPT or OCR noise create concept pages.
+- Do not create concept pages from low-quality transcript snippets, representative expressions, or generic section labels.
 
 On Windows, prefer a UTF-8 shell when validating generated files. If needed, set `[Console]::InputEncoding` and `[Console]::OutputEncoding` to UTF-8 before manual `Get-Content` or other console inspection.

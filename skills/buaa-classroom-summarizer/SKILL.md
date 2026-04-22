@@ -33,6 +33,8 @@ python scripts\collect_buaa_course_replays.py "<coursedetail-url>" --output-dir 
 python scripts\collect_buaa_course_replays.py "<coursedetail-url>" --output-dir "<output-dir>" --extract-existing --skip-existing
 ```
 
+Whole-course commands are extraction and inventory commands, not permission to generate final notes for every available lesson. For a `coursedetail` URL, enumerate or extract artifacts first, then ask the user which lesson to semantically rebuild next unless the user explicitly requests a batch finalization workflow.
+
 Runtime browser auth when local cookie reuse is unreliable:
 
 ```powershell
@@ -76,9 +78,34 @@ When the agent writes the final standalone Markdown note:
 - use a readable lesson filename, preferably the lesson title such as `2026-04-13 贝叶斯统计 第7周星期1第3,4,5节.md`
 - do not name the final note `lesson_note.md`
 - place final lesson Markdown notes for the same course in one course folder named by course title, for example `贝叶斯统计/2026-04-13 贝叶斯统计 第7周星期1第3,4,5节.md`
+- if the chosen output directory is already named exactly as the course title, write final lesson Markdown notes directly in that directory; do not create `课程名/课程名/...`
 - keep extraction artifacts such as `metadata.json`, `transcript.json`, and semantic rebuild packets in their original replay output directories; only user-facing final Markdown notes need the course-folder layout
 - start directly with the lesson title and content
 - do not show production metadata such as `状态`, `来源`, transcript coverage, replay diagnosis, or PPT extraction status in the user-facing note
+
+## Batch Finalization Rule
+
+Do not turn all extracted lessons into final Markdown notes in one unattended pass. A whole-course run may produce:
+
+- replay inventory
+- extraction artifacts
+- semantic rebuild packets
+- a course-level todo list
+
+A whole-course run must not produce many "formal notes" unless each lesson has received a real semantic rebuild and a quality pass. If the user asks to process all lessons so far, state that reliable finalization should be staged lesson-by-lesson or in small batches, and make intermediate outputs clearly non-final.
+
+## Final Note Quality Gate
+
+A user-facing final note must be a semantic reconstruction, not a decorated transcript segment list. Before writing or accepting a final note, reject it if it contains any of these patterns:
+
+- raw ASR/OCR snippets presented as "representative expressions" or "代表性表达"
+- headings such as `课堂讲解与主题推进 1`
+- boilerplate like `整理时建议不要把这一段只当作...`
+- repeated generic advice across sections instead of course-specific mathematical content
+- transcript noise such as misrecognized symbols copied into the note without correction
+- a course overview that marks low-quality diagnostics as "正式笔记"
+
+If a note fails this gate, keep only the extraction artifacts and semantic packet, then mark the lesson as needing semantic rebuild. Do not call it final.
 
 ## Semantic Rebuild Rules
 
@@ -88,6 +115,7 @@ When the agent writes the final standalone Markdown note:
 - Keep math as `$...$` or `$$...$$` only. Do not wrap formulas in backticks.
 - Treat the course transcript as the only primary source for section boundaries, lesson mainline, and completion checks.
 - Only mark a lesson final when course-transcript coverage and summary coverage both pass.
+- For math-heavy courses, reconstruct the actual mathematical objects, assumptions, equations, proof ideas, and examples. Do not substitute generic learning advice for missing semantic understanding.
 
 ## Transcript-Only Rule
 
