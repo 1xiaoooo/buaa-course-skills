@@ -35,6 +35,16 @@ python scripts\collect_buaa_course_replays.py "<coursedetail-url>" --output-dir 
 
 Whole-course commands are extraction and inventory commands, not permission to generate final notes for every available lesson. For a `coursedetail` URL, enumerate or extract artifacts first, then ask the user which lesson to semantically rebuild next unless the user explicitly requests a batch finalization workflow.
 
+## Course Identity Rule
+
+For a `coursedetail` URL, resolve the course identity before choosing a course folder or reusing vault context:
+
+- First extract the strongest available course title from classroom/SPoC metadata, saved course detail files, replay metadata, or stable replay titles.
+- Treat the normalized course title as the canonical course identity. If the title matches an existing course, it is the same course even when `course_id`, lecturer, class time, classroom, or sub_id ranges differ.
+- If no reliable title is available, use `course_id` only as a provisional identity such as `course-136278`; do not merge into an existing titled course by teacher, schedule, lesson dates, old extraction directories, or nearby vault content.
+- Preserve `course_id` and source URLs as source metadata, but do not use them to split courses that have the same confirmed title.
+- If title extraction is ambiguous and the target vault already has plausible course folders, pause for user confirmation before writing formal notes or updating trackers.
+
 Runtime browser auth when local cookie reuse is unreliable:
 
 ```powershell

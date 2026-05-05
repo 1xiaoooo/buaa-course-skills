@@ -35,6 +35,16 @@ Maintain a course or sync BUAA replay state:
 python scripts\maintain_obsidian_course.py --vault-dir "<vault-dir>" --course-name "<course-name>" --course-page-url "<coursedetail-url>" --replay-output-dir "<replay-output-dir>"
 ```
 
+## Course Identity And Placement
+
+Before adding or maintaining a BUAA course in a vault:
+
+- Resolve `course-name` from the extracted course title whenever possible. The normalized title is the course identity.
+- If the resolved title already exists in the vault, reuse that course folder. Same title means same course, even if the new `coursedetail` URL has a different `course_id`, lecturer, schedule, classroom, or sub_id range.
+- If the title is missing or unreliable, use the `course_id` only as a provisional course name such as `course-136278`, or ask the user for the intended title before writing formal notes. Do not infer the course from existing vault folders, teacher names, class times, or old extraction directories.
+- Interpret "use the previous vault" as selecting the vault root, not automatically selecting an existing course folder inside it.
+- Keep each source `course_id` and URL in sync metadata so multiple classroom sources can feed the same titled course without overwriting provenance.
+
 Build or rebuild one replay note:
 
 ```powershell
@@ -166,6 +176,8 @@ Use at least:
 - recent lesson notes for the same course
 - existing concept pages and chapter hubs
 - the current replay transcript and semantic packet
+
+Course alignment checks content fit, not administrative sameness. A different lecturer, weekday, section time, classroom, or `course_id` is not a mismatch when the confirmed course title is the same. When the title is unavailable, keep alignment provisional and avoid updating formal trackers until the course identity is confirmed.
 
 If the result is `mismatch`, keep only seed artifacts or a draft and do not write a formal final lesson note.
 
