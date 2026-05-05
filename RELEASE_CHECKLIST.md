@@ -4,23 +4,33 @@
 
 - 保持 `public beta`
 - 正式支持入口只写 `livingroom` 和 `coursedetail`
-- 不把 `SPoC notice` 当正式能力宣传
+- 不把 `SPoC notice` 当成正式能力宣传
 - 安装方式以 `npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill <skill-name> --yes --global` 为主
 
-## 发布前你最好再亲自确认一次
+## 发布前最好再亲自确认一次
 
-- 在一台干净环境上按文档完成一次安装
+- 在一台干净环境里按文档完成一次安装
+- 确认 `README.md` 和 `INSTALL.md` 里的命令能直接照着执行
+- 确认“安装后去哪里补依赖”写得足够清楚
+- 至少验证一次：
+  - 回放抽取
+  - 整门课枚举
+  - 单节课正式重建
 - 至少验证一次非 Windows 下的 runtime auth
 - 按公开文档完整跑一次端到端流程
 - 确认仓库里没有个人 token、签名链接、真实用户名、真实路径
-- 确认对外口径接受“agent 负责语义重建，脚本不直接承诺最终高质量纪要”
+- 确认对外口径接受：
+  - agent 负责语义重建
+  - 脚本负责抽取、诊断、分流、落盘
 
 ## 已经完成的部分
 
-- 仓库根文档已经统一到 transcript-first 口径
+- 根文档已经统一到 transcript-first 口径
 - 正式支持入口已经收口到 `livingroom` / `coursedetail`
 - `ppt` 已经降到辅助地位
 - seed note 不再作为默认用户可见中间产物
+- 整门课流程已经改成先枚举、分流、排队，再逐节正式处理
+- 安装说明已经补上“skill 安装目录”和“依赖安装位置”
 - skill 文档已经改成 `python scripts/...` 相对路径写法
 - 两个 skill 都有最小测试
 - transcript coverage 降级策略已经写进文档

@@ -108,6 +108,12 @@ npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-c
 
 安装完成后，请分别补充依赖，并阅读各自的 `SKILL.md`。详细说明见 [INSTALL.md](INSTALL.md)。
 
+注意：
+
+- `npx skills add ...` 安装的是 skill 副本，不是直接在这个仓库目录里运行
+- 安装完成后，需要到“安装后的 skill 目录”里补 `requirements.txt`
+- 如果你用的是 Codex，全局安装后通常在 `%USERPROFILE%\\.codex\\skills\\...`
+
 ## 推荐用法
 
 ### 方案 A：只做回放抽取
@@ -119,6 +125,7 @@ npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-c
 - 枚举可回放课次
 - 导出课程转写和元信息
 - 生成独立 Markdown 课次纪要或语义重建 packet
+- 先把一门课安全地做成“可继续整理的原料和单节输出”
 
 ### 方案 B：做完整课程知识库
 
@@ -152,12 +159,24 @@ npx skills add https://github.com/1xiaoooo/buaa-course-skills --skill obsidian-c
 - 转写优先的结构化诊断
 - 独立 Markdown 纪要导出
 - Obsidian 课程库、课次页、概念页与图谱入口维护
+- 整门课先枚举、分流、排队，再逐节进入正式重建
 
 仍需持续验证和打磨的部分包括：
 
 - 更多的跨平台实机验证
 - 非 Windows 环境下的认证与运行细节
 - 最终纪要质量仍会受到课程转写质量和课程结构影响
+
+## 首次使用建议
+
+第一次使用时，建议不要一上来就整学期全量落库。
+
+更稳的顺序是：
+
+1. 先安装 `buaa-classroom-summarizer`
+2. 先拿一节课或一门课的 `coursedetail` 跑通抽取
+3. 确认登录态、输出目录、转写状态都正常
+4. 再接 `obsidian-course-vault`
 
 ## 仓库结构
 
