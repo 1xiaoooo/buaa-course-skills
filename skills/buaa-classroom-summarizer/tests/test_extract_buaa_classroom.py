@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "extract_buaa_classroom.py"
@@ -24,6 +25,38 @@ REVIEW_SPEC.loader.exec_module(REVIEW_MODULE)
 
 
 class ExtractBuaaClassroomTests(unittest.TestCase):
+    def test_build_session_prefers_cache_before_browser_cookie_db(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_cache = MODULE.SESSION_CACHE
+            try:
+                MODULE.SESSION_CACHE = Path(tmpdir) / "buaa_browser_session.json"
+                MODULE.SESSION_CACHE.write_text(
+                    json.dumps(
+                        {
+                            "cookies": [
+                                {
+                                    "domain": ".buaa.edu.cn",
+                                    "path": "/",
+                                    "name": "sid",
+                                    "value": "cached-cookie",
+                                    "secure": False,
+                                }
+                            ],
+                            "authorization": "",
+                            "authorization_exp": 9999999999,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+                with mock.patch.object(MODULE, "browser_cookie_source_available") as browser_probe:
+                    session = MODULE.build_session("https://classroom.msa.buaa.edu.cn/livingroom?course_id=1&sub_id=2")
+                self.assertEqual(session.cookies.get("sid"), "cached-cookie")
+                self.assertEqual(getattr(session, "_codex_auth_source", ""), "cached")
+                browser_probe.assert_not_called()
+            finally:
+                MODULE.SESSION_CACHE = original_cache
+
     def test_semantic_prompt_uses_transcript_first_rules(self) -> None:
         prompt = MODULE.build_semantic_rebuild_prompt("final-explained")
         self.assertIn("课程转写永远是唯一主来源", prompt)

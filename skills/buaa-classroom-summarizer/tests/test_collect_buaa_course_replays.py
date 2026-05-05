@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -18,12 +19,12 @@ SPEC.loader.exec_module(MODULE)
 class CollectBuaaCourseReplaysTests(unittest.TestCase):
     def test_parse_url_extracts_query_params(self) -> None:
         path, params = MODULE.parse_url(
-            "https://classroom.msa.buaa.edu.cn/coursedetail?course_id=136814&tenant_code=21&foo=bar"
+            "https://classroom.msa.buaa.edu.cn/coursedetail?course_id=136814&tenant_code=21&username=23377213"
         )
         self.assertEqual(path, "/coursedetail")
         self.assertEqual(params["course_id"], "136814")
         self.assertEqual(params["tenant_code"], "21")
-        self.assertEqual(params["foo"], "bar")
+        self.assertEqual(params["username"], "23377213")
 
     def test_compare_snapshots_detects_new_replay(self) -> None:
         previous = {
@@ -45,6 +46,25 @@ class CollectBuaaCourseReplaysTests(unittest.TestCase):
         result = MODULE.compare_snapshots(previous, current)
         self.assertEqual(result["new_replay_count"], 1)
         self.assertEqual(result["new_replays"][0]["sub_id"], "1")
+
+    def test_classify_lesson_extract_reads_replay_diagnosis(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lesson_dir = Path(tmpdir)
+            (lesson_dir / "metadata.json").write_text(
+                json.dumps(
+                    {
+                        "replay_diagnosis": "partial_transcript",
+                        "has_transcript": True,
+                        "transcript_coverage": {"coverage_ratio": 0.42},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = MODULE.classify_lesson_extract(lesson_dir)
+            self.assertEqual(result["status"], "partial_transcript")
+            self.assertTrue(result["has_transcript"])
+            self.assertAlmostEqual(result["coverage_ratio"], 0.42)
 
 if __name__ == "__main__":
     unittest.main()

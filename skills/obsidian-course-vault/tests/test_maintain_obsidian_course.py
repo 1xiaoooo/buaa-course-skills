@@ -24,6 +24,15 @@ REVIEW_SPEC.loader.exec_module(REVIEW_MODULE)
 
 
 class MaintainObsidianCourseTests(unittest.TestCase):
+    def test_ensure_course_workspace_creates_course_scaffold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_dir = Path(tmpdir)
+            course_dir, concept_dir = MODULE.ensure_course_workspace(vault_dir, "测试课程")
+            self.assertTrue((course_dir / "课次").exists())
+            self.assertTrue((course_dir / "概念").exists())
+            self.assertTrue((course_dir / "资料").exists())
+            self.assertTrue(concept_dir.exists())
+
     def test_clean_outline_line_filters_english_noise(self) -> None:
         self.assertEqual(MODULE.clean_outline_line("Mathematical Sciences BUAA"), "")
         self.assertEqual(MODULE.clean_outline_line("2026-03-10 08:00"), "")

@@ -324,6 +324,16 @@ def load_session_cache() -> dict[str, Any]:
     return payload
 
 
+def browser_cookie_source_available(browser_channel: str) -> tuple[str, dict[str, Any]] | None:
+    for name in browser_candidates(browser_channel):
+        config = BROWSER_CONFIGS[name]
+        local_state = Path(str(config["local_state"]))
+        cookie_db = Path(str(config["cookie_db"]))
+        if local_state.exists() and cookie_db.exists():
+            return name, config
+    return None
+
+
 def apply_cookie_entries(session: requests.Session, cookie_entries: list[dict[str, Any]]) -> None:
     for item in cookie_entries:
         session.cookies.set(
@@ -484,11 +494,30 @@ def build_session(
     setattr(session, "_codex_runtime_login_timeout", int(runtime_login_timeout))
     setattr(session, "_codex_runtime_referer", referer)
     setattr(session, "_codex_browser_channel", browser_channel)
-    live_error = ""
-    try:
-        browser_name, browser_config = resolve_browser_config(
-            browser_channel, require_local_state=True, require_cookie_db=True
+    cached = load_session_cache()
+    cookies = cached.get("cookies", [])
+    if cookies:
+        apply_cookie_entries(session, cookies)
+        populate_auth_headers(session, str(cached.get("authorization", "") or ""))
+        setattr(session, "_codex_auth_source", "cached")
+        return session
+
+    available_browser = browser_cookie_source_available(browser_channel)
+    if available_browser is None:
+        if allow_runtime_auth:
+            return build_runtime_session(
+                referer,
+                runtime_profile_dir or RUNTIME_BROWSER_PROFILE,
+                runtime_login_timeout,
+                browser_channel,
+            )
+        raise SystemExit(
+            "No reusable BUAA session cache was found, and no supported local Chromium cookie database is available. "
+            "Rerun with browser runtime auth to sign in once and refresh the local session cache."
         )
+
+    browser_name, browser_config = available_browser
+    try:
         master_key = get_master_key(Path(browser_config["local_state"]))
         rows, cookie_source = load_cookie_rows_from_db(
             Path(browser_config["cookie_db"]),
@@ -521,14 +550,6 @@ def build_session(
         setattr(session, "_codex_auth_source", f"{browser_name}:{cookie_source}")
         return session
     except (PermissionError, OSError, sqlite3.Error, RuntimeError, FileNotFoundError) as exc:
-        live_error = str(exc)
-        cached = load_session_cache()
-        cookies = cached.get("cookies", [])
-        if cookies:
-            apply_cookie_entries(session, cookies)
-            populate_auth_headers(session, str(cached.get("authorization", "") or ""))
-            setattr(session, "_codex_auth_source", "cached")
-            return session
         if allow_runtime_auth:
             return build_runtime_session(
                 referer,
@@ -537,9 +558,9 @@ def build_session(
                 browser_channel,
             )
         raise SystemExit(
-            live_error
-            or "The browser cookie database is unavailable and no valid cached BUAA session exists yet; "
-            "rerun with browser runtime auth to refresh the cache"
+            str(exc)
+            or "The local Chromium cookie database could not be reused, and no valid cached BUAA session exists. "
+            "Rerun with browser runtime auth to refresh the cache."
         )
 
 

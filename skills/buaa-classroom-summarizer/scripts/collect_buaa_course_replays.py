@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -293,6 +294,49 @@ def compare_snapshots(previous: dict[str, Any] | None, current: dict[str, Any]) 
     }
 
 
+def read_lesson_metadata(lesson_dir: Path) -> dict[str, Any]:
+    metadata_path = lesson_dir / "metadata.json"
+    if not metadata_path.exists():
+        return {}
+    try:
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def classify_lesson_extract(lesson_dir: Path) -> dict[str, Any]:
+    metadata = read_lesson_metadata(lesson_dir)
+    diagnosis = str(metadata.get("replay_diagnosis") or "")
+    coverage = metadata.get("transcript_coverage") or {}
+    if isinstance(coverage, dict):
+        coverage_ratio = coverage.get("coverage_ratio", 0)
+    else:
+        coverage_ratio = coverage or 0
+    try:
+        coverage_ratio = float(coverage_ratio or 0)
+    except (TypeError, ValueError):
+        coverage_ratio = 0.0
+    return {
+        "status": diagnosis or "unknown",
+        "has_transcript": bool(metadata.get("has_transcript")),
+        "coverage_ratio": coverage_ratio,
+        "metadata_path": str(lesson_dir / "metadata.json"),
+    }
+
+
+def print_course_summary(summary: dict[str, Any]) -> None:
+    print(json.dumps(summary, ensure_ascii=False))
+
+
+def print_extract_progress(sub_id: str, title: str, result: dict[str, Any], prefix: str = "extract") -> None:
+    status = str(result.get("status") or "unknown")
+    coverage_ratio = result.get("coverage_ratio")
+    coverage_text = ""
+    if isinstance(coverage_ratio, (int, float)) and coverage_ratio > 0:
+        coverage_text = f" coverage={coverage_ratio:.2f}"
+    print(f"{prefix} {sub_id} {title} {status}{coverage_text}")
+
+
 def handle_livingroom(
     url: str,
     output_dir: Path,
@@ -386,9 +430,11 @@ def handle_coursedetail(
     replay_ready = [item for item in index if item["replay_ready"]]
     summary: dict[str, Any] = {
         "course_id": course_id,
+        "course_title": payload.get("data", {}).get("course_name", ""),
         "total_lessons": len(index),
         "replay_ready_lessons": len(replay_ready),
         "snapshot_file": str(snapshot_path),
+        "extract_existing_requested": bool(extract_existing),
     }
     if check_new_replays:
         replay_check = compare_snapshots(previous_snapshot, current_snapshot)
@@ -398,7 +444,7 @@ def handle_coursedetail(
             encoding="utf-8",
         )
         summary["new_replay_check"] = replay_check
-    print(json.dumps(summary, ensure_ascii=False))
+    print_course_summary(summary)
 
     if not extract_existing:
         return 0
@@ -415,11 +461,20 @@ def handle_coursedetail(
 
     lessons_dir = output_dir / "lessons"
     lessons_dir.mkdir(parents=True, exist_ok=True)
+    extract_status_counter: Counter[str] = Counter()
+    extracted_count = 0
+    skipped_existing_count = 0
+    failed_lessons: list[dict[str, Any]] = []
+    selected_sub_ids: list[str] = []
     for item in selected:
+        selected_sub_ids.append(str(item["sub_id"]))
         lesson_dir = lessons_dir / item["sub_id"]
         metadata_path = lesson_dir / "metadata.json"
         if skip_existing and metadata_path.exists():
-            print(f"skip {item['sub_id']} {item['sub_title']}")
+            skipped_existing_count += 1
+            result = classify_lesson_extract(lesson_dir)
+            extract_status_counter[str(result["status"] or "unknown")] += 1
+            print_extract_progress(str(item["sub_id"]), str(item["sub_title"]), result, prefix="skip")
             continue
         lesson_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
@@ -447,7 +502,50 @@ def handle_coursedetail(
             cmd.extend(["--browser-login-timeout", str(browser_login_timeout)])
         if browser_channel:
             cmd.extend(["--browser-channel", browser_channel])
-        subprocess.run(cmd, check=True, env=utf8_env())
+        completed = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=utf8_env(),
+        )
+        if completed.returncode != 0:
+            failed_lessons.append(
+                {
+                    "sub_id": str(item["sub_id"]),
+                    "sub_title": str(item["sub_title"]),
+                    "returncode": completed.returncode,
+                    "stderr": (completed.stderr or completed.stdout or "").strip(),
+                }
+            )
+            print(f"extract {item['sub_id']} {item['sub_title']} failed")
+            continue
+        extracted_count += 1
+        result = classify_lesson_extract(lesson_dir)
+        extract_status_counter[str(result["status"] or "unknown")] += 1
+        print_extract_progress(str(item["sub_id"]), str(item["sub_title"]), result)
+    extract_summary = {
+        "course_id": course_id,
+        "course_title": payload.get("data", {}).get("course_name", ""),
+        "selected_lessons": len(selected),
+        "selected_sub_ids": selected_sub_ids,
+        "extracted_count": extracted_count,
+        "skipped_existing_count": skipped_existing_count,
+        "failed_count": len(failed_lessons),
+        "status_counts": dict(extract_status_counter),
+        "transcript_ready_count": extract_status_counter.get("transcript_only", 0),
+        "waiting_transcript_count": extract_status_counter.get("waiting_transcript", 0),
+        "partial_transcript_count": extract_status_counter.get("partial_transcript", 0),
+        "failed_lessons": failed_lessons,
+    }
+    (output_dir / "course_extract_summary.json").write_text(
+        json.dumps(extract_summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print_course_summary(extract_summary)
+    if failed_lessons:
+        return 1
     return 0
 
 

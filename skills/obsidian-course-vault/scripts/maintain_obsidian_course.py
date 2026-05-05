@@ -190,6 +190,16 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
+def ensure_course_workspace(vault_dir: Path, course_name: str) -> tuple[Path, Path]:
+    course_dir = vault_dir / "01-Courses" / course_name
+    concept_dir = vault_dir / "02-Concepts" / course_name
+    (course_dir / "课次").mkdir(parents=True, exist_ok=True)
+    (course_dir / "概念").mkdir(parents=True, exist_ok=True)
+    (course_dir / "资料").mkdir(parents=True, exist_ok=True)
+    concept_dir.mkdir(parents=True, exist_ok=True)
+    return course_dir, concept_dir
+
+
 def metadata_age_hours(path: Path) -> float:
     return max(0.0, (datetime.now().timestamp() - path.stat().st_mtime) / 3600.0)
 
@@ -628,6 +638,8 @@ def normalize_lesson_frontmatter(course_name: str, course_dir: Path) -> list[dic
             "concepts": concepts,
             "review_items": review_items,
         }
+        if existing_source in PENDING_LESSON_SOURCES:
+            updates["source"] = existing_source
         if quality_issues and (semantic_rebuild_completed or existing_source == "buaa-replay-semantic-rebuild"):
             updates["source"] = "buaa-replay-quality-rejected"
             updates["semantic_rebuild_status"] = "rejected"
@@ -1024,6 +1036,18 @@ def build_course_config(
     persisted = {key: value for key, value in config.items() if key not in {"lightweight_teacher_review", "teacher_review_max_windows"}}
     save_course_config(config_path, persisted)
     return config
+
+
+def ensure_course_config(
+    vault_dir: Path,
+    course_name: str,
+    hubs: list[HubInfo],
+    args: argparse.Namespace,
+) -> tuple[Path, Path, Path, dict[str, Any]]:
+    course_dir, concept_dir = ensure_course_workspace(vault_dir, course_name)
+    config_path = course_dir / "course-config.json"
+    config = build_course_config(course_name, config_path, hubs, args)
+    return course_dir, concept_dir, config_path, config
 
 
 def ensure_semantic_graph_bootstrap(
@@ -2442,7 +2466,7 @@ def build_waiting_transcript_note(
             "preferred_stream": metadata.get("preferred_stream", config.get("preferred_replay_stream", "teacher")),
             "has_transcript": False,
             "has_ppt_outline": bool(outline_slides),
-            "draft_basis": "ppt_outline" if outline_slides else "waiting_transcript",
+            "draft_basis": "waiting_transcript",
             "rebuild_mode": "pending-transcript",
             "has_semantic_rebuild_packet": False,
             "concepts": [],
@@ -2970,6 +2994,8 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
     lesson_index = json.loads(read_text(lesson_index_path))
     replay_check_path = output_dir / "new_replay_check.json"
     replay_check = json.loads(read_text(replay_check_path)) if replay_check_path.exists() else {}
+    extract_summary_path = output_dir / "course_extract_summary.json"
+    extract_summary = json.loads(read_text(extract_summary_path)) if extract_summary_path.exists() else {}
     summarized_dates = {lesson["date"] for lesson in lesson_summaries if lesson["date"]}
     pending_semantic = semantic_rebuild_pending_lessons(course_dir, output_dir)
     pending_semantic_sub_ids = {item["sub_id"] for item in pending_semantic if item.get("sub_id")}
@@ -2979,10 +3005,20 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
     backlog: list[dict[str, Any]] = []
     upcoming: list[dict[str, Any]] = []
     review_candidates: list[dict[str, Any]] = []
+    waiting_transcript: list[dict[str, Any]] = []
+    partial_transcript: list[dict[str, Any]] = []
     for item in lesson_index:
         if item["sub_id"] in ignored_sub_ids or item["date"] in ignored_dates:
             continue
         if item["replay_ready"]:
+            lesson_metadata = read_json(output_dir / "lessons" / str(item["sub_id"]) / "metadata.json") if (output_dir / "lessons" / str(item["sub_id"]) / "metadata.json").exists() else {}
+            diagnosis = str(lesson_metadata.get("replay_diagnosis") or "")
+            if diagnosis == "waiting_transcript":
+                waiting_transcript.append(item)
+                continue
+            if diagnosis == "partial_transcript":
+                partial_transcript.append(item)
+                continue
             if item["sub_id"] in pending_semantic_sub_ids:
                 continue
             if item["date"] not in summarized_dates:
@@ -3002,7 +3038,15 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
         f"- 最近检查：{replay_check.get('checked_at', '')}",
         f"- 已有回放：{sum(1 for item in lesson_index if item['replay_ready'])}",
         f"- 新增回放：{replay_check.get('new_replay_count', 0)}",
+        f"- 待平台补转写：{len(waiting_transcript)}",
+        f"- 转写覆盖不足：{len(partial_transcript)}",
     ]
+    if extract_summary:
+        sync_lines.append(
+            f"- 最近整课抽取：transcript_ready={extract_summary.get('transcript_ready_count', 0)} / "
+            f"waiting={extract_summary.get('waiting_transcript_count', 0)} / "
+            f"partial={extract_summary.get('partial_transcript_count', 0)}"
+        )
     if sync_error:
         sync_lines.append(f"- 本次在线同步失败，以下内容来自已有缓存：{sync_error}")
     sync_lines.extend(["", "## 新增回放", ""])
@@ -3026,6 +3070,18 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
             sync_lines.append(f"- {item['date']} {item['title'].replace(item['date'], '', 1).strip()}{suffix}{mode_text}")
     else:
         sync_lines.append("- 当前没有待语义重建的课次。")
+    sync_lines.extend(["", "## 待平台补转写", ""])
+    if waiting_transcript:
+        for item in waiting_transcript:
+            sync_lines.append(f"- {item['date']} {item['sub_title']} ({item['sub_id']})")
+    else:
+        sync_lines.append("- 当前没有待平台补转写的课次。")
+    sync_lines.extend(["", "## 转写覆盖不足", ""])
+    if partial_transcript:
+        for item in partial_transcript:
+            sync_lines.append(f"- {item['date']} {item['sub_title']} ({item['sub_id']})")
+    else:
+        sync_lines.append("- 当前没有转写覆盖不足的课次。")
     sync_lines.extend(["", "## 建议复查已整理课次", ""])
     if review_candidates:
         for item in review_candidates:
@@ -3054,6 +3110,14 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
             backlog_lines.append(f"- [ ] {item['date']} {item['sub_title']} | 回放：{item['livingroom_url']}")
     else:
         backlog_lines.append("- 当前没有待整理回放。")
+    if waiting_transcript:
+        backlog_lines.extend(["", "## 待平台补转写", ""])
+        for item in waiting_transcript:
+            backlog_lines.append(f"- [ ] {item['date']} {item['sub_title']} ({item['sub_id']})")
+    if partial_transcript:
+        backlog_lines.extend(["", "## 转写覆盖不足", ""])
+        for item in partial_transcript:
+            backlog_lines.append(f"- [ ] {item['date']} {item['sub_title']} ({item['sub_id']})")
     write_text(course_dir / "待整理回放.md", "\n".join(backlog_lines))
 
     return {
@@ -3061,6 +3125,8 @@ def sync_buaa_replays(config: dict[str, Any], course_dir: Path, lesson_summaries
         "replay_ready_lessons": sum(1 for item in lesson_index if item["replay_ready"]),
         "new_replay_count": replay_check.get("new_replay_count", 0),
         "backlog_count": len(backlog),
+        "waiting_transcript_count": len(waiting_transcript),
+        "partial_transcript_count": len(partial_transcript),
         "pending_semantic_count": len(pending_semantic),
         "review_candidate_count": len(review_candidates),
         "upcoming_count": len(upcoming),
@@ -3114,10 +3180,7 @@ def main() -> None:
     args = parse_args()
     course_name = sanitize_name(args.course_name)
     vault_dir = Path(args.vault_dir)
-    course_dir = vault_dir / "01-Courses" / course_name
-    concept_dir = vault_dir / "02-Concepts" / course_name
-    course_dir.mkdir(parents=True, exist_ok=True)
-    concept_dir.mkdir(parents=True, exist_ok=True)
+    course_dir, concept_dir = ensure_course_workspace(vault_dir, course_name)
     cleanup_graph_growth_notes(course_dir)
 
     existing_hub_files = sorted(path for path in concept_dir.glob("[0-9][0-9]-*图谱.md"))
@@ -3147,8 +3210,7 @@ def main() -> None:
             concept_summaries,
         )
 
-    config_path = course_dir / "course-config.json"
-    config = build_course_config(course_name, config_path, hubs, args)
+    course_dir, concept_dir, config_path, config = ensure_course_config(vault_dir, course_name, hubs, args)
 
     buaa_sync = {"status": "skipped", "reason": "disabled"}
     if not args.skip_buaa_sync:
