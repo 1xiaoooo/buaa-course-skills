@@ -1100,6 +1100,24 @@ def lesson_path_for_replay_item(course_dir: Path, item: dict[str, Any]) -> Path:
     return course_dir / "课次" / f"{lesson_title}.md"
 
 
+def lesson_path_from_packet(course_dir: Path, packet: dict[str, Any], packet_path: Path) -> Path:
+    metadata = packet.get("metadata") or {}
+    date = str(metadata.get("date") or "").strip()
+    lesson_title = str(packet.get("lesson_title") or "").strip()
+    course_title = str(packet.get("course_title") or packet.get("course_name") or "").strip()
+    sub_title = str(metadata.get("sub_title") or "").strip()
+    if date and sub_title:
+        lesson_title = f"{date} {normalize_sub_title(sub_title)}".strip()
+    elif lesson_title and course_title:
+        lesson_title = lesson_title.replace(course_title, "", 1).strip()
+        lesson_title = re.sub(r"\s+", " ", lesson_title)
+    if not lesson_title:
+        lesson_title = f"{date} {normalize_sub_title(sub_title)}".strip()
+    if not lesson_title:
+        lesson_title = packet_path.parent.parent.name
+    return course_dir / "课次" / f"{sanitize_name(lesson_title)}.md"
+
+
 def source_upgrade_reasons(course_dir: Path, output_dir: Path, item: dict[str, Any]) -> list[str]:
     lesson_path = lesson_path_for_replay_item(course_dir, item)
     if not lesson_path.exists():
@@ -1150,8 +1168,13 @@ def semantic_rebuild_pending_lessons(course_dir: Path, replay_output_dir: Path |
                     packet = read_json(packet_path)
                 except Exception:
                     continue
-                lesson_note_path = Path(str(packet.get("lesson_note_path") or ""))
-                if lesson_note_path.exists():
+                packet_lesson_note_path = str(packet.get("lesson_note_path") or "").strip()
+                lesson_note_path = (
+                    Path(packet_lesson_note_path)
+                    if packet_lesson_note_path
+                    else lesson_path_from_packet(course_dir, packet, packet_path)
+                )
+                if lesson_note_path.is_file():
                     frontmatter, _ = extract_frontmatter_and_body(read_text(lesson_note_path))
                     if bool(frontmatter.get("semantic_rebuild_completed")) or str(frontmatter.get("source") or "") == "buaa-replay-semantic-rebuild":
                         continue

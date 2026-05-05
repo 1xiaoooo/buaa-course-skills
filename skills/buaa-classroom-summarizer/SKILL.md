@@ -97,7 +97,7 @@ Then create a reviewer packet:
 python scripts\review_final_note.py --note "<final-note.md>" --semantic-input "<semantic_rebuild_input.json>" --output-dir "<review-dir>"
 ```
 
-Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent when the environment supports subagents. In environments without subagents, run a separate reviewer pass with the same prompt. The reviewer must not edit the note during review.
+Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent only when the active system/developer instructions allow spawning one. If subagents are unavailable or not allowed, run a separate reviewer pass yourself with the same prompt, write the result as `final_note_review/final_note_review_result.json`, and do not edit the note during review.
 
 When the agent writes the final standalone Markdown note:
 
@@ -113,14 +113,22 @@ When the agent writes the final standalone Markdown note:
 
 ## Batch Finalization Rule
 
-Do not turn all extracted lessons into final Markdown notes in one unattended pass. A whole-course run may produce:
+Whole-course extraction is still not permission to blindly finalize every replay. A whole-course run may produce:
 
 - replay inventory
 - extraction artifacts
 - semantic rebuild packets
 - a course-level todo list
 
-A whole-course run must not produce many "formal notes" unless each lesson has received a real semantic rebuild and a quality pass. If the user asks to process all lessons so far, state that reliable finalization should be staged lesson-by-lesson or in small batches, and make intermediate outputs clearly non-final.
+If the user explicitly asks to process all currently pending lessons, batch finalization is allowed, but it must remain lesson-by-lesson inside the batch:
+
+- Skip lessons already finalized unless the user asks for a revision.
+- For each candidate lesson, verify the transcript exists and is non-empty before authoring.
+- Read the full transcript plus the semantic packet before writing that lesson.
+- Run `validate_final_note.py`, create the review packet, and record a pass result for the current note hash before calling that lesson final.
+- If a lesson fails any gate, leave only artifacts/packet or a review-gated draft and continue with other eligible lessons.
+- Prefer running tracker/overview maintenance once after the batch, not after every lesson, unless an intermediate checkpoint is needed.
+- Reuse existing extraction artifacts and semantic packets when their inputs have not changed; do not rerun browser extraction just to rebuild prose.
 
 ## Final Note Quality Gate
 
@@ -146,6 +154,12 @@ Finalization requires both gates on the current Markdown bytes:
 
 If the note changes after either gate, both gate results are invalid and must be rerun.
 
+Reviewer implementation detail:
+
+- If subagents are permitted, use an independent reviewer agent.
+- If subagents are not permitted by active instructions, run a separate reviewer pass in the main agent, write `final_note_review_result.json`, and ensure `reviewed_note_sha256` matches `final_note_review_input.json`.
+- Do not rerun review for an unchanged note when an existing `final_note_review_result.json` already passes for the same hash.
+
 Reviewer decisions:
 
 - `pass`: the note faithfully covers the transcript, handles course-domain substance, preserves supported affairs/emphasis, and is safe to present as final.
@@ -163,6 +177,7 @@ Absence is not failure. Missing homework, exam, grading, or deadline information
 - Treat the course transcript as the only primary source for section boundaries, lesson mainline, and completion checks.
 - Only mark a lesson final when course-transcript coverage and summary coverage both pass.
 - Reconstruct course-specific substance. Do not substitute generic learning advice for missing semantic understanding.
+- If `transcript.txt` is missing, empty, or near-empty, treat the replay as waiting for transcript material even if a tracker lists it under backlog. Do not create a formal note from metadata, schedule, title, or PPT alone.
 
 ## Authoring Contract
 
@@ -215,8 +230,17 @@ This mode prepares short teacher-stream review clips and `teacher_review.json`. 
 ## Failure Rules
 
 - If the course transcript is missing, keep extraction artifacts but do not invent a formal lesson note.
+- If the course transcript is empty or near-empty, handle it the same as missing transcript: keep it in waiting/backlog and do not write a final note.
 - If course-transcript coverage is clearly partial, keep only a diagnostic draft rather than a final note.
 - If the course transcript exists but the current summary only covers an early slice of the lesson or leaves large uncovered gaps, mark the note `needs_review` instead of final.
 - If session reuse fails, rerun with `--browser-runtime-auth`.
 
-On Windows, prefer a UTF-8 shell when validating generated files. If needed, set `[Console]::InputEncoding` and `[Console]::OutputEncoding` to UTF-8 before manual `Get-Content` or other console inspection.
+On Windows, prefer a UTF-8 shell when validating generated files. If needed, set `[Console]::InputEncoding` and `[Console]::OutputEncoding` to UTF-8 before manual `Get-Content` or other console inspection. For inline Python in PowerShell, use:
+
+```powershell
+@'
+print("hello")
+'@ | python -
+```
+
+Do not use Bash heredoc syntax such as `python - <<'PY'` in PowerShell.

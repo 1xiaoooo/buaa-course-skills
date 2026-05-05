@@ -91,7 +91,20 @@ Then create a reviewer packet:
 python scripts\review_final_note.py --note "<lesson-note.md>" --semantic-input "<semantic_rebuild_input.json>" --output-dir "<review-dir>"
 ```
 
-Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent when the environment supports subagents. In environments without subagents, run a separate reviewer pass with the same prompt. The reviewer must not edit the note during review.
+Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent only when the active system/developer instructions allow spawning one. If subagents are unavailable or not allowed, run a separate reviewer pass yourself with the same prompt, write the result as `final_note_review/final_note_review_result.json`, and do not edit the note during review.
+
+## Efficient Batch Workflow
+
+When the user explicitly asks to organize all pending BUAA replays for a course:
+
+1. Reuse the existing replay extraction directory and semantic packets when present.
+2. Build any missing semantic packets first; do not rerun browser extraction for lessons that already have current `transcript.txt` and `semantic_rebuild_input.json`.
+3. Filter candidates before writing: skip finalized lessons, skip future lessons, and keep missing/empty/near-empty transcripts in waiting/backlog.
+4. For each eligible lesson, read the full transcript, write the formal note, run validation, create the review packet, and record a passing review for the current note hash.
+5. Run `maintain_obsidian_course.py` once after the batch to refresh overview, trackers, backlog, and sync notes. Run it earlier only when you need a checkpoint or need it to create missing directories/packets.
+6. Do not regenerate concept pages from weak transcript-only hints during the batch; defer graph growth to transcript-stable concepts and the normal maintenance pass.
+
+This is a batching optimization, not a relaxation of the semantic gates.
 
 ## Mandatory Semantic Workflow
 
@@ -107,6 +120,22 @@ For semantic modes:
 8. Only allow a formal lesson page when transcript coverage and transcript-based summary coverage both pass.
 
 If semantic rebuild is still pending, do not count the lesson as finished in course trackers.
+
+For a formal Obsidian replay note, the frontmatter must include at least:
+
+- `type: lesson`
+- `course`
+- `title`
+- `date`
+- `replay_sub_id`
+- `source: buaa-replay-semantic-rebuild`
+- `replay_diagnosis`
+- `has_semantic_rebuild_packet: true`
+- `semantic_rebuild_completed: true`
+- `semantic_rebuild_status: completed`
+- `concepts`
+
+Without these fields, maintenance may keep the lesson in pending semantic rebuild or exclude it from `已整理课次.md`.
 
 ## Final Note Quality Gate
 
@@ -131,6 +160,12 @@ Finalization requires both gates on the current Markdown bytes:
 - The independent reviewer returns `decision=pass`, `finalization_allowed=true`, and `reviewed_note_sha256` equal to `final_note_review_input.json` `note.sha256`.
 
 If the note changes after either gate, both gate results are invalid and must be rerun. Do not update course overview, trackers, or graph growth from an outdated review.
+
+Reviewer implementation detail:
+
+- If subagents are permitted, use an independent reviewer agent.
+- If subagents are not permitted by active instructions, run a separate reviewer pass in the main agent, write `final_note_review_result.json`, and ensure `reviewed_note_sha256` matches `final_note_review_input.json`.
+- Do not rerun review for an unchanged note when an existing `final_note_review_result.json` already passes for the same hash.
 
 Reviewer decisions:
 
@@ -201,6 +236,7 @@ When `replay_diagnosis=transcript_only`:
 ## Waiting and Partial Transcript Rules
 
 - `waiting_transcript`: create only a waiting placeholder. Do not invent a summary.
+- Empty or near-empty `transcript.txt` counts as waiting material even if a tracker currently lists the replay under backlog instead of `waiting_transcript`.
 - `partial_transcript`: create only a diagnostic draft. Do not treat it as a final lesson note.
 - `needs_review`: create a review-gated note when the course transcript exists but the current transcript-based summary still leaves large uncovered ranges.
 
@@ -228,3 +264,13 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 - Do not add a lesson to course trackers or graph growth if `validate_final_note.py` rejects it.
 
 On Windows, prefer a UTF-8 shell when validating generated files. If needed, set `[Console]::InputEncoding` and `[Console]::OutputEncoding` to UTF-8 before manual `Get-Content` or other console inspection.
+
+For inline Python in PowerShell, use:
+
+```powershell
+@'
+print("hello")
+'@ | python -
+```
+
+Do not use Bash heredoc syntax such as `python - <<'PY'` in PowerShell.
