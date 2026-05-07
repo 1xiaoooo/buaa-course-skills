@@ -250,6 +250,29 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
+def ensure_obsidian_ignore_filters(vault_dir: Path) -> None:
+    app_json = vault_dir / ".obsidian" / "app.json"
+    app_json.parent.mkdir(parents=True, exist_ok=True)
+    if app_json.exists():
+        try:
+            config = json.loads(read_text(app_json))
+        except json.JSONDecodeError:
+            config = {}
+    else:
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+    current = config.get("userIgnoreFilters", [])
+    if not isinstance(current, list):
+        current = []
+    filters = [str(item) for item in current if str(item).strip()]
+    for pattern in ["**/.course-internal/**", "**/semantic_rebuild/**", "**/final_note_review/**"]:
+        if pattern not in filters:
+            filters.append(pattern)
+    config["userIgnoreFilters"] = filters
+    write_text(app_json, json.dumps(config, ensure_ascii=False, indent=2))
+
+
 def ensure_course_workspace(vault_dir: Path, course_name: str) -> tuple[Path, Path]:
     course_dir = vault_dir / "01-Courses" / course_name
     concept_dir = vault_dir / "02-Concepts" / course_name
@@ -258,6 +281,21 @@ def ensure_course_workspace(vault_dir: Path, course_name: str) -> tuple[Path, Pa
     (course_dir / "资料").mkdir(parents=True, exist_ok=True)
     concept_dir.mkdir(parents=True, exist_ok=True)
     return course_dir, concept_dir
+
+
+def ensure_course_summaries(
+    course_name: str,
+    course_dir: Path,
+    concept_dir: Path,
+    hubs: list[HubInfo],
+    concept_summaries: list[dict[str, Any]],
+    lesson_summaries: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if not concept_summaries:
+        concept_summaries = normalize_concept_frontmatter(course_name, concept_dir, hubs)
+    if not lesson_summaries:
+        lesson_summaries = normalize_lesson_frontmatter(course_name, course_dir)
+    return concept_summaries, lesson_summaries
 
 
 def metadata_age_hours(path: Path) -> float:
@@ -835,7 +873,8 @@ def update_course_overview(
         frontmatter, body = {}, f"# {course_name}\n"
     chapter_lines = [f"- 图谱入口：[[02-Concepts/{course_name}/{course_name}概念图谱]]"]
     chapter_lines.extend(f"- {hub.title}：[[02-Concepts/{course_name}/{Path(hub.file_name).stem}]]" for hub in hubs)
-    tracker_lines = [f"- [[{name}]]" for name in tracker_names]
+    tracker_lines = ["- [[事务]]"]
+    tracker_lines.extend(f"- [[{name}]]" for name in tracker_names)
     tracker_lines.append(f"- [[{sync_note_name}]]")
     tracker_lines.append(f"- [[{backlog_note_name}]]")
     body = replace_or_append_section(body, "## 章节地图", chapter_lines)
@@ -990,7 +1029,7 @@ def update_course_affairs(vault_dir: Path, course_name: str, course_dir: Path, l
     if affairs_path.exists() and AUTO_AFFAIRS_MARKER not in read_text(affairs_path):
         return
 
-    reviewed_lines = ["# 事务", "", "## 作业", "", "- 当前没有已由 agent 审核的作业事务。", "", "## 考试", "", "- 当前没有已由 agent 审核的考试事务。", "", "## 通知", "", "- 当前没有已由 agent 审核的通知事务。", ""]
+    reviewed_lines = ["# 事务", "", "## 作业", "", "- 当前没有明确作业事务。", "", "## 考试", "", "- 当前没有明确考试事务。", "", "## 通知", "", "- 当前没有明确通知事务。", ""]
     write_text(affairs_path, "\n".join(reviewed_lines))
     return
 
@@ -3427,6 +3466,7 @@ def main() -> None:
     args = parse_args()
     course_name = sanitize_name(args.course_name)
     vault_dir = Path(args.vault_dir)
+    ensure_obsidian_ignore_filters(vault_dir)
     course_dir, concept_dir = ensure_course_workspace(vault_dir, course_name)
     cleanup_graph_growth_notes(course_dir)
 
@@ -3439,15 +3479,25 @@ def main() -> None:
     concept_summaries: list[dict[str, Any]] = []
     lesson_summaries: list[dict[str, Any]] = []
     if not args.skip_frontmatter:
-        concept_summaries = normalize_concept_frontmatter(course_name, concept_dir, hubs)
-        lesson_summaries = normalize_lesson_frontmatter(course_name, course_dir)
+        concept_summaries, lesson_summaries = ensure_course_summaries(
+            course_name,
+            course_dir,
+            concept_dir,
+            hubs,
+            concept_summaries,
+            lesson_summaries,
+        )
 
     tracker_names: list[str] = []
     if not args.skip_trackers:
-        if not lesson_summaries:
-            lesson_summaries = normalize_lesson_frontmatter(course_name, course_dir)
-        if not concept_summaries:
-            concept_summaries = normalize_concept_frontmatter(course_name, concept_dir, hubs)
+        concept_summaries, lesson_summaries = ensure_course_summaries(
+            course_name,
+            course_dir,
+            concept_dir,
+            hubs,
+            concept_summaries,
+            lesson_summaries,
+        )
         tracker_names = update_course_trackers(
             course_name,
             course_dir,
@@ -3487,8 +3537,14 @@ def main() -> None:
             if not args.skip_buaa_sync:
                 buaa_sync = sync_buaa_replays(config, course_dir, lesson_summaries)
             if not args.skip_trackers:
-                if not concept_summaries:
-                    concept_summaries = normalize_concept_frontmatter(course_name, concept_dir, hubs)
+                concept_summaries, lesson_summaries = ensure_course_summaries(
+                    course_name,
+                    course_dir,
+                    concept_dir,
+                    hubs,
+                    concept_summaries,
+                    lesson_summaries,
+                )
                 tracker_names = update_course_trackers(
                     course_name,
                     course_dir,
@@ -3512,8 +3568,14 @@ def main() -> None:
         if not args.skip_buaa_sync:
             buaa_sync = sync_buaa_replays(config, course_dir, lesson_summaries)
         if not args.skip_trackers:
-            if not concept_summaries:
-                concept_summaries = normalize_concept_frontmatter(course_name, concept_dir, hubs)
+            concept_summaries, lesson_summaries = ensure_course_summaries(
+                course_name,
+                course_dir,
+                concept_dir,
+                hubs,
+                concept_summaries,
+                lesson_summaries,
+            )
             tracker_names = update_course_trackers(
                 course_name,
                 course_dir,
@@ -3525,8 +3587,14 @@ def main() -> None:
 
     tracker_names = unique_keep_order(tracker_names)
     if not args.skip_trackers:
-        if not lesson_summaries:
-            lesson_summaries = normalize_lesson_frontmatter(course_name, course_dir)
+        concept_summaries, lesson_summaries = ensure_course_summaries(
+            course_name,
+            course_dir,
+            concept_dir,
+            hubs,
+            concept_summaries,
+            lesson_summaries,
+        )
         update_course_affairs(vault_dir, course_name, course_dir, lesson_summaries)
     update_course_overview(course_name, course_dir, hubs, tracker_names, "回放同步", "待整理回放")
 

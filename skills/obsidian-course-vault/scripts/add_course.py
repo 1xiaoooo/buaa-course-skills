@@ -29,6 +29,29 @@ def write_text(path: Path, content: str) -> None:
         path.write_text(content, encoding="utf-8")
 
 
+def ensure_obsidian_ignore_filters(vault_dir: Path) -> None:
+    app_json = vault_dir / ".obsidian" / "app.json"
+    app_json.parent.mkdir(parents=True, exist_ok=True)
+    if app_json.exists():
+        try:
+            config = json.loads(app_json.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            config = {}
+    else:
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+    current = config.get("userIgnoreFilters", [])
+    if not isinstance(current, list):
+        current = []
+    filters = [str(item) for item in current if str(item).strip()]
+    for pattern in ["**/.course-internal/**", "**/semantic_rebuild/**", "**/final_note_review/**"]:
+        if pattern not in filters:
+            filters.append(pattern)
+    config["userIgnoreFilters"] = filters
+    app_json.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--vault-dir", required=True)
@@ -41,6 +64,7 @@ def main() -> None:
     args = parse_args()
     vault_dir = Path(args.vault_dir)
     course_name = sanitize_name(args.course_name)
+    ensure_obsidian_ignore_filters(vault_dir)
     course_dir = vault_dir / "01-Courses" / course_name
     concepts_dir = vault_dir / "02-Concepts" / course_name
 
@@ -75,6 +99,7 @@ def main() -> None:
 
 ## 课程事务
 
+- [[事务]]
 - [[章节完成度]]
 - [[已整理课次]]
 - [[待回看问题]]
@@ -88,15 +113,15 @@ def main() -> None:
 
 ## 作业
 
-- 当前没有已由 agent 审核的作业事务。
+- 当前没有明确作业事务。
 
 ## 考试
 
-- 当前没有已由 agent 审核的考试事务。
+- 当前没有明确考试事务。
 
 ## 通知
 
-- 当前没有已由 agent 审核的通知事务。
+- 当前没有明确通知事务。
 """
 
     affairs_candidates = """# Affairs Candidates

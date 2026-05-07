@@ -40,7 +40,7 @@ class MaintainObsidianCourseTests(unittest.TestCase):
             self.assertTrue((course_dir / "资料").exists())
             self.assertTrue(concept_dir.exists())
 
-    def test_add_course_scaffold_initializes_agent_reviewed_affairs_files(self) -> None:
+    def test_add_course_scaffold_keeps_public_files_free_of_process_language(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             old_argv = sys.argv[:]
             sys.argv = [
@@ -56,12 +56,28 @@ class MaintainObsidianCourseTests(unittest.TestCase):
                 sys.argv = old_argv
             course_dir = Path(tmpdir) / "01-Courses" / "首次测试课程"
             affairs = (course_dir / "事务.md").read_text(encoding="utf-8")
+            overview = (course_dir / "00-课程总览.md").read_text(encoding="utf-8")
+            replay_sync = (course_dir / "回放同步.md").read_text(encoding="utf-8")
+            backlog = (course_dir / "待整理回放.md").read_text(encoding="utf-8")
             candidates = (course_dir / ".course-internal" / "affairs-candidates.md").read_text(encoding="utf-8")
-            self.assertIn("agent 审核", affairs)
+            app_config = json.loads((Path(tmpdir) / ".obsidian" / "app.json").read_text(encoding="utf-8"))
+            self.assertIn("当前没有明确作业事务", affairs)
+            self.assertIn("[[事务]]", overview)
+            self.assertNotIn("agent 审核", affairs)
+            self.assertNotIn("agent 审核", overview)
             self.assertNotIn("事务候选", affairs)
             self.assertNotIn("affairs-candidates", affairs)
             self.assertNotIn("auto-generated-affairs", affairs)
+            self.assertNotIn("agent 审核", replay_sync)
+            self.assertNotIn("candidate", replay_sync)
+            self.assertNotIn("semantic_rebuild", replay_sync)
+            self.assertNotIn("agent 审核", backlog)
+            self.assertNotIn("candidate", backlog)
+            self.assertNotIn("semantic_rebuild", backlog)
             self.assertIn("由 agent 审核、压缩、去重", candidates)
+            self.assertIn("**/.course-internal/**", app_config["userIgnoreFilters"])
+            self.assertIn("**/semantic_rebuild/**", app_config["userIgnoreFilters"])
+            self.assertIn("**/final_note_review/**", app_config["userIgnoreFilters"])
 
     def test_clean_outline_line_filters_english_noise(self) -> None:
         self.assertEqual(MODULE.clean_outline_line("Mathematical Sciences BUAA"), "")

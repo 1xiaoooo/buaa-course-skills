@@ -291,6 +291,10 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 
 ## Output Rules
 
+- Public outputs are only finished products: `00-课程总览.md`, `事务.md`, `章节完成度.md`, `已整理课次.md`, `待回看问题.md`, `回放同步.md`, `待整理回放.md`, `03-Admin/*.md`, formal lesson notes, and formal concept pages.
+- Internal artifacts are only for workflow use: `.course-internal/*`, `semantic_rebuild/*`, `final_note_review/*`, draft packets, reviewer packets, and other diagnostic notes.
+- Never link internal artifacts from public outputs. User-facing placeholder text must also avoid process language such as "agent review", "candidate", or "semantic rebuild".
+- Ensure Obsidian ignores internal workflow paths such as `.course-internal`, `semantic_rebuild`, and `final_note_review` before writing candidate or review artifacts inside a vault.
 - Keep concept links visible in the note body, not only in frontmatter.
 - Keep visible time references in final lesson sections.
 - Keep math as `$...$` or `$$...$$` only.
