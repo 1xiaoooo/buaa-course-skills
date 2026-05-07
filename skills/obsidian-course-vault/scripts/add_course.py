@@ -91,6 +91,33 @@ def main() -> None:
 - [[待回看问题]]
 - [[回放同步]]
 - [[待整理回放]]
+- [[事务候选]]
+- [[03-Admin/作业总表]]
+- [[03-Admin/考试与通知]]
+
+<!-- auto-generated-affairs -->
+
+- 当前仅生成了事务候选；需要 agent 审核 `事务候选.md` 后再整理正式事务。
+"""
+
+    affairs_candidates = """# 事务候选
+
+<!-- auto-generated-affairs -->
+
+- 来源：已完成课次的 `课程事务` / `课堂事务` 小节。
+- 使用方式：由 agent 审核、压缩、去重，再写入 `事务.md` 和 Admin 表。
+
+## 作业
+
+- 当前没有汇总出的课程事务。
+
+## 考试
+
+- 当前没有汇总出的课程事务。
+
+## 通知
+
+- 当前没有汇总出的课程事务。
 """
 
     graph_entry = f"""# {course_name}概念图谱
@@ -142,6 +169,7 @@ def main() -> None:
 
     write_text(course_dir / "00-课程总览.md", overview)
     write_text(course_dir / "事务.md", course_tasks)
+    write_text(course_dir / "事务候选.md", affairs_candidates)
     write_text(course_dir / "章节完成度.md", chapter_progress)
     write_text(course_dir / "已整理课次.md", lesson_index)
     write_text(course_dir / "待回看问题.md", review_questions)

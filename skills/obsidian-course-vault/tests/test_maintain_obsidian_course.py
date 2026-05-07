@@ -22,6 +22,13 @@ assert REVIEW_SPEC is not None and REVIEW_SPEC.loader is not None
 sys.modules[REVIEW_SPEC.name] = REVIEW_MODULE
 REVIEW_SPEC.loader.exec_module(REVIEW_MODULE)
 
+ADD_COURSE_MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "add_course.py"
+ADD_COURSE_SPEC = importlib.util.spec_from_file_location("add_course_obsidian", ADD_COURSE_MODULE_PATH)
+ADD_COURSE_MODULE = importlib.util.module_from_spec(ADD_COURSE_SPEC)
+assert ADD_COURSE_SPEC is not None and ADD_COURSE_SPEC.loader is not None
+sys.modules[ADD_COURSE_SPEC.name] = ADD_COURSE_MODULE
+ADD_COURSE_SPEC.loader.exec_module(ADD_COURSE_MODULE)
+
 
 class MaintainObsidianCourseTests(unittest.TestCase):
     def test_ensure_course_workspace_creates_course_scaffold(self) -> None:
@@ -32,6 +39,28 @@ class MaintainObsidianCourseTests(unittest.TestCase):
             self.assertTrue((course_dir / "概念").exists())
             self.assertTrue((course_dir / "资料").exists())
             self.assertTrue(concept_dir.exists())
+
+    def test_add_course_scaffold_initializes_agent_reviewed_affairs_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_argv = sys.argv[:]
+            sys.argv = [
+                "add_course.py",
+                "--vault-dir",
+                tmpdir,
+                "--course-name",
+                "首次测试课程",
+            ]
+            try:
+                ADD_COURSE_MODULE.main()
+            finally:
+                sys.argv = old_argv
+            course_dir = Path(tmpdir) / "01-Courses" / "首次测试课程"
+            affairs = (course_dir / "事务.md").read_text(encoding="utf-8")
+            candidates = (course_dir / "事务候选.md").read_text(encoding="utf-8")
+            self.assertIn("[[事务候选]]", affairs)
+            self.assertIn("agent 审核", affairs)
+            self.assertIn("auto-generated-affairs", affairs)
+            self.assertIn("由 agent 审核、压缩、去重", candidates)
 
     def test_clean_outline_line_filters_english_noise(self) -> None:
         self.assertEqual(MODULE.clean_outline_line("Mathematical Sciences BUAA"), "")
