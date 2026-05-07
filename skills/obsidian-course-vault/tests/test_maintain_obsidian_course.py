@@ -56,10 +56,11 @@ class MaintainObsidianCourseTests(unittest.TestCase):
                 sys.argv = old_argv
             course_dir = Path(tmpdir) / "01-Courses" / "首次测试课程"
             affairs = (course_dir / "事务.md").read_text(encoding="utf-8")
-            candidates = (course_dir / "事务候选.md").read_text(encoding="utf-8")
-            self.assertIn("[[事务候选]]", affairs)
+            candidates = (course_dir / ".course-internal" / "affairs-candidates.md").read_text(encoding="utf-8")
             self.assertIn("agent 审核", affairs)
-            self.assertIn("auto-generated-affairs", affairs)
+            self.assertNotIn("事务候选", affairs)
+            self.assertNotIn("affairs-candidates", affairs)
+            self.assertNotIn("auto-generated-affairs", affairs)
             self.assertIn("由 agent 审核、压缩、去重", candidates)
 
     def test_clean_outline_line_filters_english_noise(self) -> None:
@@ -255,7 +256,7 @@ concepts:
             )
             summaries = MODULE.normalize_lesson_frontmatter("测试课程", course_dir)
             MODULE.update_course_affairs(vault_dir, "测试课程", course_dir, summaries)
-            course_affairs = (course_dir / "事务候选.md").read_text(encoding="utf-8")
+            course_affairs = (course_dir / ".course-internal" / "affairs-candidates.md").read_text(encoding="utf-8")
             reviewed_affairs = (course_dir / "事务.md").read_text(encoding="utf-8")
             assignments = (admin_dir / "作业总表.md").read_text(encoding="utf-8")
             notices = (admin_dir / "考试与通知.md").read_text(encoding="utf-8")

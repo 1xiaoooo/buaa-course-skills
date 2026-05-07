@@ -154,13 +154,15 @@ Only write transcript-supported affairs as confident bullets. Put uncertain due 
 
 During maintenance, scripts may refresh:
 
-- course-level `事务候选.md` from finished lesson notes
+- course-internal `.course-internal/affairs-candidates.md` from finished lesson notes
 - course-level `事务.md` only when it is still an unreviewed auto-generated placeholder
 - vault-level `03-Admin/作业总表.md` and `03-Admin/考试与通知.md` only after an agent affairs review has condensed the candidates
 
 Course-level affairs are a reviewed digest, not a keyword dump. Keep only items that change what a student should do, check, submit, read, attend, or expect in assessment. Compress repeated or vague mentions into one short entry per date. Exclude ordinary teaching content, general encouragement, study advice without a concrete deliverable, concept-review suggestions, and broad course narration. `课程安排` may remain inside lesson notes for local context, but do not roll it up to course-level `事务.md` unless it contains a concrete schedule/location/session change that belongs under `通知`.
 
-Do not let keyword extraction write final affairs directly. Use this flow: generate `事务候选.md`; run an agent affairs review in the main agent or an allowed independent reviewer; then write concise reviewed entries into `事务.md` and the Admin tables. Do not require human review, and do not overwrite an agent-reviewed `事务.md` during routine maintenance.
+Do not let keyword extraction write final affairs directly. Use this flow: generate `.course-internal/affairs-candidates.md`; run an agent affairs review in the main agent or an allowed independent reviewer; then write concise reviewed entries into `事务.md` and the Admin tables. Do not require human review, and do not overwrite an agent-reviewed `事务.md` during routine maintenance.
+
+Do not expose affairs candidates in user-facing notes. Do not link `.course-internal/affairs-candidates.md` from `事务.md`, `00-课程总览.md`, trackers, or Admin pages.
 
 Agent affairs review must explicitly reject or merge:
 

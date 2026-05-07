@@ -116,6 +116,8 @@ CONCRETE_AFFAIR_SIGNALS = [
     "资料",
 ]
 AUTO_AFFAIRS_MARKER = "<!-- auto-generated-affairs -->"
+INTERNAL_DIR_NAME = ".course-internal"
+AFFAIRS_CANDIDATES_NAME = "affairs-candidates.md"
 
 OUTLINE_SECTION_LIMIT = 12
 GRAPH_CONCEPT_PROMOTION_MIN_LESSONS = 2
@@ -968,7 +970,7 @@ def update_course_affairs(vault_dir: Path, course_name: str, course_dir: Path, l
                 elif category == "通知":
                     rows["通知"].append(f"| {course_name} | {clean_date} | {clean_item} | {lesson_link} |")
 
-    lines = ["# 事务候选", "", AUTO_AFFAIRS_MARKER, "", "- 来源：已完成课次的 `课程事务` / `课堂事务` 小节。", "- 使用方式：由 agent 审核、压缩、去重，再写入 `事务.md` 和 Admin 表。", ""]
+    lines = ["# Affairs Candidates", "", AUTO_AFFAIRS_MARKER, "", "- 来源：已完成课次的 `课程事务` / `课堂事务` 小节。", "- 使用方式：由 agent 审核、压缩、去重，再写入 `事务.md` 和 Admin 表。", ""]
     total = 0
     for category in AFFAIR_CATEGORIES:
         lines.extend([f"## {category}", ""])
@@ -982,13 +984,13 @@ def update_course_affairs(vault_dir: Path, course_name: str, course_dir: Path, l
         lines.append("")
     if total == 0:
         lines.extend(["## 维护提示", "", "- 已整理课次中暂未提取到作业、考试、课程安排或通知。", ""])
-    write_text(course_dir / "事务候选.md", "\n".join(lines))
+    write_text(course_dir / INTERNAL_DIR_NAME / AFFAIRS_CANDIDATES_NAME, "\n".join(lines))
 
     affairs_path = course_dir / "事务.md"
     if affairs_path.exists() and AUTO_AFFAIRS_MARKER not in read_text(affairs_path):
         return
 
-    reviewed_lines = ["# 事务", "", "- [[章节完成度]]", "- [[已整理课次]]", "- [[待回看问题]]", "- [[回放同步]]", "- [[待整理回放]]", "- [[事务候选]]", "- [[03-Admin/作业总表]]", "- [[03-Admin/考试与通知]]", "", AUTO_AFFAIRS_MARKER, "", "- 当前仅生成了事务候选；需要 agent 审核 `事务候选.md` 后再整理正式事务。", ""]
+    reviewed_lines = ["# 事务", "", "## 作业", "", "- 当前没有已由 agent 审核的作业事务。", "", "## 考试", "", "- 当前没有已由 agent 审核的考试事务。", "", "## 通知", "", "- 当前没有已由 agent 审核的通知事务。", ""]
     write_text(affairs_path, "\n".join(reviewed_lines))
     return
 
