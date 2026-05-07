@@ -137,6 +137,41 @@ For a formal Obsidian replay note, the frontmatter must include at least:
 
 Without these fields, maintenance may keep the lesson in pending semantic rebuild or exclude it from `已整理课次.md`.
 
+## Course Affairs Maintenance
+
+Treat course affairs as a first-class output, not incidental prose.
+
+When a transcript contains supported logistics, write them in the lesson note under `## 课程事务` with these categories when applicable:
+
+- `### 作业`
+- `### 考试`
+- `### 课程安排`
+- `### 通知`
+
+Existing notes may use `## 课堂事务`; maintenance treats it as the same rollup source. Prefer `## 课程事务` for newly written notes so the structure is explicit.
+
+Only write transcript-supported affairs as confident bullets. Put uncertain due dates, weights, submission formats, exam scope, or policy details under `待核对` instead of promoting them to a firm affair.
+
+During maintenance, scripts may refresh:
+
+- course-level `事务候选.md` from finished lesson notes
+- course-level `事务.md` only when it is still an unreviewed auto-generated placeholder
+- vault-level `03-Admin/作业总表.md` and `03-Admin/考试与通知.md` only after an agent affairs review has condensed the candidates
+
+Course-level affairs are a reviewed digest, not a keyword dump. Keep only items that change what a student should do, check, submit, read, attend, or expect in assessment. Compress repeated or vague mentions into one short entry per date. Exclude ordinary teaching content, general encouragement, study advice without a concrete deliverable, concept-review suggestions, and broad course narration. `课程安排` may remain inside lesson notes for local context, but do not roll it up to course-level `事务.md` unless it contains a concrete schedule/location/session change that belongs under `通知`.
+
+Do not let keyword extraction write final affairs directly. Use this flow: generate `事务候选.md`; run an agent affairs review in the main agent or an allowed independent reviewer; then write concise reviewed entries into `事务.md` and the Admin tables. Do not require human review, and do not overwrite an agent-reviewed `事务.md` during routine maintenance.
+
+Agent affairs review must explicitly reject or merge:
+
+- ordinary teaching content or concept-review suggestions
+- general encouragement, learning methods, or motivational remarks
+- repeated mentions of the same assignment/exam/notice
+- vague “maybe useful for homework” notes without a concrete deliverable
+- exam-like keyword hits caused only by words such as `分数`, `分类`, or model scores
+
+Do not roll up affairs from waiting transcript notes, partial transcript notes, quality rejected notes, or notes still pending semantic rebuild. Placeholder sentences such as “当前未从转写中识别出稳定...” are not affairs and must not appear in `事务.md` or the Admin tables.
+
 ## Final Note Quality Gate
 
 Do not write or count a lesson as finished if the note is only a decorated transcript segment list. Reject the note and keep it as `needs_review` if it contains:

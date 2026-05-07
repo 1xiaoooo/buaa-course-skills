@@ -173,6 +173,93 @@ replay_diagnosis: needs_review
             summaries = MODULE.normalize_lesson_frontmatter("测试课程", course_dir)
             self.assertEqual(summaries, [])
 
+    def test_course_affairs_write_candidates_without_overwriting_agent_reviewed_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_dir = Path(tmpdir)
+            course_dir = vault_dir / "01-Courses" / "测试课程"
+            admin_dir = vault_dir / "03-Admin"
+            lesson_dir = course_dir / "课次"
+            lesson_dir.mkdir(parents=True)
+            admin_dir.mkdir(parents=True)
+            MODULE.write_text(
+                admin_dir / "作业总表.md",
+                "# 作业总表\n\n| 课程 | 日期 | 内容 | 截止时间 | 状态 | 备注 |\n| --- | --- | --- | --- | --- | --- |\n| 其他课 | 2026-03-01 | 旧作业 |  | 待核对 |  |\n",
+            )
+            MODULE.write_text(course_dir / "事务.md", "# 事务\n\n## 作业\n\n- 已由 agent 审核的条目。\n")
+            MODULE.write_text(
+                admin_dir / "考试与通知.md",
+                "# 考试与通知\n\n## 考试\n\n| 课程 | 日期 | 类型 | 范围 | 备注 |\n| --- | --- | --- | --- | --- |\n\n## 通知\n\n| 课程 | 日期 | 内容 | 备注 |\n| --- | --- | --- | --- |\n",
+            )
+            MODULE.write_text(
+                lesson_dir / "2026-04-01 第1周星期1 第1,2节.md",
+                """---
+course: 测试课程
+title: 2026-04-01 第1周星期1 第1,2节
+date: 2026-04-01
+source: buaa-replay-semantic-rebuild
+semantic_rebuild_completed: true
+concepts:
+  - 概念A
+---
+
+# 2026-04-01 第1周星期1 第1,2节
+
+## 课程事务
+
+### 作业
+
+- 本周完成第一章习题，提交方式以后续平台通知为准。
+- 当前未从转写中识别出稳定的作业信息。
+
+### 考试
+
+- 期末开卷考试。
+
+### 课程安排
+
+- 下周继续讨论模型选择。
+
+### 通知
+
+- 课程资料会放在北航云盘。
+""",
+            )
+            summaries = MODULE.normalize_lesson_frontmatter("测试课程", course_dir)
+            MODULE.update_course_affairs(vault_dir, "测试课程", course_dir, summaries)
+            course_affairs = (course_dir / "事务候选.md").read_text(encoding="utf-8")
+            reviewed_affairs = (course_dir / "事务.md").read_text(encoding="utf-8")
+            assignments = (admin_dir / "作业总表.md").read_text(encoding="utf-8")
+            notices = (admin_dir / "考试与通知.md").read_text(encoding="utf-8")
+            self.assertIn("本周完成第一章习题", course_affairs)
+            self.assertNotIn("当前未从转写中识别出稳定", course_affairs)
+            self.assertIn("已由 agent 审核", reviewed_affairs)
+            self.assertNotIn("本周完成第一章习题", reviewed_affairs)
+            self.assertIn("| 其他课 | 2026-03-01 | 旧作业", assignments)
+            self.assertNotIn("测试课程", assignments)
+            self.assertNotIn("测试课程", notices)
+
+    def test_extract_affairs_keeps_only_concrete_classroom_affairs(self) -> None:
+        body = """## 课堂事务
+
+时间参考：约 `01:00:00`
+
+- 老师提醒作业提交：如果错过平台提交时间，下一次提交时一起补交并说明原因。
+- 老师鼓励大家把大问题拆成小问题，代码、推导和资料查阅都可以作为学习过程的一部分。
+
+### 考试
+
+- 考核方式：平时作业 20 分，共 4 次；大作业 30 分；期末开卷考试 50 分。
+
+### 通知
+
+- 课程资料会放在北航云盘，课堂 PPT 中给出的文件夹名是 `StatisticalLearning`。
+"""
+        affairs = MODULE.extract_lesson_affairs(body)
+        self.assertIn("老师提醒作业提交", "\n".join(affairs["作业"]))
+        self.assertIn("考核方式", "\n".join(affairs["考试"]))
+        self.assertIn("北航云盘", "\n".join(affairs["通知"]))
+        self.assertNotIn("拆成小问题", "\n".join(affairs["作业"]))
+
     def test_metadata_refresh_ignores_missing_ppt_outline(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             lesson_dir = Path(tmpdir)

@@ -58,6 +58,64 @@ DEFAULT_TRACKER_NAMES = ["章节完成度", "已整理课次", "待回看问题"
 DEFAULT_SYNC_NOTE_NAME = "回放同步"
 DEFAULT_BACKLOG_NOTE_NAME = "待整理回放"
 SEMANTIC_REBUILD_MODES = {"final-lite", "final-explained"}
+AFFAIR_CATEGORIES = ["作业", "考试", "通知"]
+LESSON_AFFAIR_CATEGORIES = ["作业", "考试", "课程安排", "通知"]
+AFFAIR_PLACEHOLDER_PATTERNS = [
+    "当前未从转写中识别出稳定",
+    "当前没有汇总出的课程事务",
+    "本节未发现",
+    "本节未提到明确",
+    "未识别出稳定",
+    "未识别出除",
+    "尚未自动改写为",
+    "只有后续 agent 复核或二次流程确认后",
+]
+LOW_VALUE_AFFAIR_PATTERNS = [
+    "认真对待",
+    "不只是提交代码或结果",
+    "可以查资料",
+    "参考代码",
+    "AI 辅助",
+    "AI辅助",
+    "代码不会写",
+    "推导不会做",
+    "编程语言不熟悉",
+    "能做多少先做多少",
+    "拆成小问题",
+    "拆解",
+    "学习过程",
+    "理解算法",
+    "诊断结果",
+]
+CONCRETE_AFFAIR_SIGNALS = [
+    "作业",
+    "习题",
+    "提交",
+    "补交",
+    "自改",
+    "参考解答",
+    "题目",
+    "组队",
+    "截止",
+    "评分",
+    "分值",
+    "占比",
+    "开卷",
+    "闭卷",
+    "测验",
+    "考试",
+    "期中",
+    "期末",
+    "范围",
+    "云盘",
+    "课程平台",
+    "课程页面",
+    "邮箱",
+    "微信",
+    "教室",
+    "资料",
+]
+AUTO_AFFAIRS_MARKER = "<!-- auto-generated-affairs -->"
 
 OUTLINE_SECTION_LIMIT = 12
 GRAPH_CONCEPT_PROMOTION_MIN_LESSONS = 2
@@ -411,6 +469,71 @@ def first_nonempty_bullets(body: str, heading_names: list[str]) -> list[str]:
     return [item for item in get_bullet_items(body, heading_names) if item not in {"", "-"}]
 
 
+def is_placeholder_affair(item: str) -> bool:
+    stripped = item.strip()
+    if not stripped or stripped in {"-", " -"}:
+        return True
+    return any(pattern in stripped for pattern in AFFAIR_PLACEHOLDER_PATTERNS)
+
+
+def is_concrete_affair(item: str) -> bool:
+    if is_placeholder_affair(item):
+        return False
+    if any(pattern in item for pattern in LOW_VALUE_AFFAIR_PATTERNS):
+        return False
+    return any(signal in item for signal in CONCRETE_AFFAIR_SIGNALS)
+
+
+def affair_category_from_text(text: str) -> str:
+    if any(keyword in text for keyword in ["考试", "考核", "期中", "期末", "开卷", "闭卷", "测验", "分值"]):
+        return "考试"
+    if any(keyword in text for keyword in ["后续通知", "通知为准", "课程页面", "课程平台", "云盘", "邮箱", "微信"]):
+        return "通知"
+    if any(keyword in text for keyword in ["作业", "习题", "练习", "提交", "补交", "大作业"]):
+        return "作业"
+    if any(keyword in text for keyword in ["通知", "资料", "平台", "截止", "deadline"]):
+        return "通知"
+    if any(keyword in text for keyword in ["下周", "课程安排", "课堂", "讨论", "案例", "展示", "汇报", "实验", "换到"]):
+        return "课程安排"
+    return ""
+
+
+def extract_lesson_affairs(body: str) -> dict[str, list[str]]:
+    affairs = {category: [] for category in LESSON_AFFAIR_CATEGORIES}
+    in_affairs = False
+    current_category = ""
+    for line in body.splitlines():
+        heading = re.match(r"^(#{2,3})\s+(.*)$", line)
+        if heading:
+            level = len(heading.group(1))
+            title = heading.group(2).strip()
+            if level == 2:
+                in_affairs = title in {"课程事务", "课堂事务"}
+                current_category = ""
+                continue
+            if level == 3:
+                if in_affairs and title in affairs:
+                    in_affairs = True
+                    current_category = title
+                elif in_affairs:
+                    in_affairs = False
+                    current_category = ""
+                continue
+        if not in_affairs or not current_category:
+            category = ""
+        else:
+            category = current_category
+        stripped = line.strip()
+        if not stripped.startswith("- "):
+            continue
+        item = stripped[2:].strip()
+        if not category:
+            category = affair_category_from_text(item)
+        if category and is_concrete_affair(item):
+            affairs[category].append(item)
+    return {category: unique_keep_order(items) for category, items in affairs.items()}
+
+
 def remove_sections(body: str, heading_names: list[str]) -> str:
     lines = body.splitlines()
     kept: list[str] = []
@@ -630,6 +753,7 @@ def normalize_lesson_frontmatter(course_name: str, course_dir: Path) -> list[dic
             for item in first_nonempty_bullets(body, ["待核对"])
             if item not in {"", " -", "[[课次名]]"} and "概念名" not in item
         ]
+        affairs = extract_lesson_affairs(body)
         updates = {
             "type": "lesson",
             "course": course_name,
@@ -664,6 +788,7 @@ def normalize_lesson_frontmatter(course_name: str, course_dir: Path) -> list[dic
                 "concepts": concepts,
                 "concept_count": len(concepts),
                 "review_items": review_items,
+                "affairs": affairs,
             }
         )
     return lesson_summaries
@@ -769,6 +894,103 @@ def update_course_trackers(
     write_text(course_dir / "待回看问题.md", "\n".join(review_lines))
 
     return tracker_names
+
+
+def escape_table_cell(value: str) -> str:
+    return value.replace("\n", " ").replace("|", "\\|").strip()
+
+
+def replace_course_rows_in_table(text: str, course_name: str, new_rows: list[str], columns: str) -> str:
+    lines = text.splitlines()
+    column_count = len([cell for cell in columns.strip().strip("|").split("|") if cell.strip()])
+    separator = "| " + " | ".join(["---"] * column_count) + " |"
+    table_start = None
+    for idx, line in enumerate(lines):
+        if line.strip() == columns:
+            table_start = idx
+            break
+    if table_start is None:
+        prefix = text.rstrip()
+        if prefix:
+            prefix += "\n\n"
+        return prefix + "\n".join([columns, separator, *new_rows]).rstrip() + "\n"
+
+    table_end = len(lines)
+    for idx in range(table_start + 1, len(lines)):
+        stripped = lines[idx].strip()
+        if not stripped:
+            table_end = idx
+            break
+        if stripped.startswith("#"):
+            table_end = idx
+            break
+    kept_rows: list[str] = []
+    for row in lines[table_start + 2 : table_end]:
+        if not row.strip().startswith("|"):
+            kept_rows.append(row)
+            continue
+        cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+        if cells and cells[0] == course_name:
+            continue
+        kept_rows.append(row)
+    replacement = lines[: table_start + 2] + kept_rows + new_rows + lines[table_end:]
+    return "\n".join(replacement).rstrip() + "\n"
+
+
+def replace_course_rows_in_exam_notice_note(text: str, course_name: str, exam_rows: list[str], notice_rows: list[str]) -> str:
+    exam_columns = "| 课程 | 日期 | 类型 | 范围 | 备注 |"
+    notice_columns = "| 课程 | 日期 | 内容 | 备注 |"
+    text = replace_course_rows_in_table(text, course_name, exam_rows, exam_columns)
+    return replace_course_rows_in_table(text, course_name, notice_rows, notice_columns)
+
+
+def update_course_affairs(vault_dir: Path, course_name: str, course_dir: Path, lesson_summaries: list[dict[str, Any]]) -> None:
+    grouped = {category: [] for category in AFFAIR_CATEGORIES}
+    rows = {
+        "作业": [],
+        "考试": [],
+        "通知": [],
+    }
+    for lesson in sorted(lesson_summaries, key=lambda item: item["date"] or item["title"]):
+        affairs = lesson.get("affairs", {})
+        lesson_title = lesson["title"]
+        date = lesson["date"]
+        lesson_link = f"[[课次/{lesson_title}]]"
+        for category in AFFAIR_CATEGORIES:
+            for item in affairs.get(category, []):
+                grouped[category].append((lesson_title, item))
+                clean_item = escape_table_cell(item)
+                clean_date = escape_table_cell(date)
+                if category == "作业":
+                    rows["作业"].append(f"| {course_name} | {clean_date} | {clean_item} | 待核对 | 待核对 | {lesson_link} |")
+                elif category == "考试":
+                    rows["考试"].append(f"| {course_name} | {clean_date} | 待核对 | 待核对 | {clean_item}；来源：{lesson_link} |")
+                elif category == "通知":
+                    rows["通知"].append(f"| {course_name} | {clean_date} | {clean_item} | {lesson_link} |")
+
+    lines = ["# 事务候选", "", AUTO_AFFAIRS_MARKER, "", "- 来源：已完成课次的 `课程事务` / `课堂事务` 小节。", "- 使用方式：由 agent 审核、压缩、去重，再写入 `事务.md` 和 Admin 表。", ""]
+    total = 0
+    for category in AFFAIR_CATEGORIES:
+        lines.extend([f"## {category}", ""])
+        items = grouped[category]
+        if items:
+            for lesson_title, item in items:
+                lines.append(f"- [[课次/{lesson_title}]]：{item}")
+                total += 1
+        else:
+            lines.append("- 当前没有汇总出的课程事务。")
+        lines.append("")
+    if total == 0:
+        lines.extend(["## 维护提示", "", "- 已整理课次中暂未提取到作业、考试、课程安排或通知。", ""])
+    write_text(course_dir / "事务候选.md", "\n".join(lines))
+
+    affairs_path = course_dir / "事务.md"
+    if affairs_path.exists() and AUTO_AFFAIRS_MARKER not in read_text(affairs_path):
+        return
+
+    reviewed_lines = ["# 事务", "", "- [[章节完成度]]", "- [[已整理课次]]", "- [[待回看问题]]", "- [[回放同步]]", "- [[待整理回放]]", "- [[事务候选]]", "- [[03-Admin/作业总表]]", "- [[03-Admin/考试与通知]]", "", AUTO_AFFAIRS_MARKER, "", "- 当前仅生成了事务候选；需要 agent 审核 `事务候选.md` 后再整理正式事务。", ""]
+    write_text(affairs_path, "\n".join(reviewed_lines))
+    return
 
 
 def build_graph_growth_candidates(
@@ -2744,7 +2966,7 @@ def build_replay_final_note(
                 "### 事务复核",
                 "",
                 "- 当前只准备了教师流事务片段，尚未自动改写为“已复核结论”。",
-                "- 只有后续人工或二次流程确认后，才应把相关条目标成“已通过教师流复核”。",
+                "- 只有后续 agent 复核或二次流程确认后，才应把相关条目标成“已通过教师流复核”。",
                 "",
             ]
         )
@@ -3300,6 +3522,10 @@ def main() -> None:
             )
 
     tracker_names = unique_keep_order(tracker_names)
+    if not args.skip_trackers:
+        if not lesson_summaries:
+            lesson_summaries = normalize_lesson_frontmatter(course_name, course_dir)
+        update_course_affairs(vault_dir, course_name, course_dir, lesson_summaries)
     update_course_overview(course_name, course_dir, hubs, tracker_names, "回放同步", "待整理回放")
 
     noise = {"noise_count": 0, "findings": []}
