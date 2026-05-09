@@ -91,7 +91,7 @@ Then create a reviewer packet:
 python scripts\review_final_note.py --note "<lesson-note.md>" --semantic-input "<semantic_rebuild_input.json>" --output-dir "<review-dir>"
 ```
 
-Use `final_note_review/final_note_review_prompt.md` with an independent reviewer agent only when the active system/developer instructions allow spawning one. If subagents are unavailable or not allowed, run a separate reviewer pass yourself with the same prompt, write the result as `final_note_review/final_note_review_result.json`, and do not edit the note during review.
+The reviewer packet directory must be outside the Obsidian vault. If `--note` is inside a vault and `--output-dir` is omitted, `review_final_note.py` writes to `$HOME/.codex/course-vault-work/final_note_review/...`. Use `final_note_review_prompt.md` with an independent reviewer agent only when the active system/developer instructions allow spawning one. If subagents are unavailable or not allowed, run a separate reviewer pass yourself with the same prompt, write the result as `final_note_review_result.json`, and do not edit the note during review.
 
 ## Efficient Batch Workflow
 
@@ -114,7 +114,7 @@ For semantic modes:
 2. Run a course-alignment check before accepting the note.
 3. Rewrite the note semantically.
 4. Run `scripts\validate_final_note.py` on the rewritten Markdown.
-5. Generate a reviewer packet with `scripts\review_final_note.py`.
+5. Generate a reviewer packet with `scripts\review_final_note.py` into a vault-external work directory.
 6. Run an independent reviewer pass against the current note hash.
 7. Mark the lesson as finished only after semantic rebuild completes, hard gate passes, and reviewer returns `pass`.
 8. Only allow a formal lesson page when transcript coverage and transcript-based summary coverage both pass.
@@ -292,9 +292,9 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 ## Output Rules
 
 - Public outputs are only finished products: `00-课程总览.md`, `事务.md`, `章节完成度.md`, `已整理课次.md`, `待回看问题.md`, `回放同步.md`, `待整理回放.md`, `03-Admin/*.md`, formal lesson notes, and formal concept pages.
-- Internal artifacts are only for workflow use: `.course-internal/*`, `semantic_rebuild/*`, `final_note_review/*`, draft packets, reviewer packets, and other diagnostic notes.
+- Internal artifacts are only for workflow use. Do not put reviewer packets, final-note review results, draft packets, or other diagnostic notes inside the Obsidian vault. `.course-internal/*` and `semantic_rebuild/*` are legacy/internal script artifacts only; avoid creating new user-visible workflow material in the vault.
 - Never link internal artifacts from public outputs. User-facing placeholder text must also avoid process language such as "agent review", "candidate", or "semantic rebuild".
-- Ensure Obsidian ignores internal workflow paths such as `.course-internal`, `semantic_rebuild`, and `final_note_review` before writing candidate or review artifacts inside a vault.
+- Ensure Obsidian ignores legacy internal workflow paths such as `.course-internal`, `semantic_rebuild`, and `final_note_review`, but do not rely on ignore filters as the boundary. New `final_note_review` packets must live outside the vault.
 - Keep concept links visible in the note body, not only in frontmatter.
 - Keep visible time references in final lesson sections. Time references are a hard gate: write replay-locatable timestamp ranges such as `时间参考：约 \`03:29-18:58\`` or, after the first hour, `时间参考：约 \`01:05:31-01:23:21\``. Never write `01:20-01:39` to mean the 80th to 99th classroom minute; after one hour, use `HH:MM:SS`. Time ranges must be monotone in note order and should be long enough to represent a real major lesson section.
 - Keep math as `$...$` or `$$...$$` only.

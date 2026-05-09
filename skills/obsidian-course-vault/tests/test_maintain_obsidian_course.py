@@ -441,6 +441,47 @@ concepts:
             self.assertIn("旧审查结论失效", prompt)
             self.assertIn("提前下课、自主做题、课堂展示", prompt)
 
+    def test_review_final_note_default_output_stays_outside_vault(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault = Path(tmpdir) / "Vault"
+            lesson_dir = vault / "01-Courses" / "测试课程" / "课次"
+            lesson_dir.mkdir(parents=True)
+            (vault / ".obsidian").mkdir()
+            note = lesson_dir / "lesson.md"
+            note.write_text("# 测试课次\n\n## 内容纪要\n\n时间参考：约 `00:00-08:00`\n\n老师说明了任务要求。\n", encoding="utf-8")
+            old_argv = sys.argv[:]
+            sys.argv = ["review_final_note.py", "--note", str(note), "--json"]
+            try:
+                self.assertEqual(REVIEW_MODULE.main(), 0)
+            finally:
+                sys.argv = old_argv
+            self.assertFalse((lesson_dir / "final_note_review").exists())
+            expected_root = Path.home() / ".codex" / "course-vault-work" / "final_note_review" / vault.name
+            self.assertTrue(expected_root.exists())
+
+    def test_review_final_note_rejects_output_dir_inside_vault(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault = Path(tmpdir) / "Vault"
+            lesson_dir = vault / "01-Courses" / "测试课程" / "课次"
+            lesson_dir.mkdir(parents=True)
+            (vault / ".obsidian").mkdir()
+            note = lesson_dir / "lesson.md"
+            note.write_text("# 测试课次\n\n## 内容纪要\n\n时间参考：约 `00:00-08:00`\n\n老师说明了任务要求。\n", encoding="utf-8")
+            old_argv = sys.argv[:]
+            sys.argv = [
+                "review_final_note.py",
+                "--note",
+                str(note),
+                "--output-dir",
+                str(lesson_dir / "final_note_review"),
+            ]
+            try:
+                with self.assertRaises(SystemExit):
+                    REVIEW_MODULE.main()
+            finally:
+                sys.argv = old_argv
+            self.assertFalse((lesson_dir / "final_note_review").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

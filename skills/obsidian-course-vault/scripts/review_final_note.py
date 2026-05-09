@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,40 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def find_vault_root(path: Path) -> Path | None:
+    for candidate in [path, *path.parents]:
+        if (candidate / ".obsidian").exists():
+            return candidate
+    return None
+
+
+def path_is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def safe_path_part(value: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", value).strip(" ._")
+    return cleaned or "unnamed"
+
+
+def default_output_dir(note_path: Path) -> Path:
+    vault_root = find_vault_root(note_path)
+    if not vault_root:
+        return note_path.parent / "final_note_review"
+    try:
+        relative_parent = note_path.parent.relative_to(vault_root)
+    except ValueError:
+        relative_parent = Path()
+    vault_key = safe_path_part(vault_root.name)
+    note_key = safe_path_part(note_path.stem)
+    parent_key = hashlib.sha256(str(note_path.parent.resolve()).encode("utf-8")).hexdigest()[:12]
+    return Path.home() / ".codex" / "course-vault-work" / "final_note_review" / vault_key / relative_parent / f"{note_key}-{parent_key}"
 
 
 def infer_transcript_path(explicit: str, semantic_packet: dict[str, Any]) -> str:
@@ -119,7 +154,7 @@ def main() -> int:
     parser.add_argument("--note", required=True, help="Current final-note Markdown to review")
     parser.add_argument("--transcript", default="", help="Full transcript path. Defaults to semantic input references.transcript")
     parser.add_argument("--semantic-input", default="", help="semantic_rebuild_input.json path")
-    parser.add_argument("--output-dir", default="", help="Review packet directory. Defaults to <note-dir>/final_note_review")
+    parser.add_argument("--output-dir", default="", help="Review packet directory. Defaults outside an Obsidian vault when --note is inside one")
     parser.add_argument("--json", action="store_true", help="Print machine-readable result")
     args = parser.parse_args()
 
@@ -131,7 +166,10 @@ def main() -> int:
     semantic_packet = read_json(semantic_path) if args.semantic_input else {}
     transcript_raw = infer_transcript_path(args.transcript, semantic_packet)
     transcript_path = Path(transcript_raw).resolve() if transcript_raw else Path()
-    output_dir = Path(args.output_dir).resolve() if args.output_dir else note_path.parent / "final_note_review"
+    vault_root = find_vault_root(note_path)
+    output_dir = Path(args.output_dir).resolve() if args.output_dir else default_output_dir(note_path).resolve()
+    if vault_root and path_is_relative_to(output_dir, vault_root):
+        raise SystemExit(f"review output must be outside the Obsidian vault: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     note_text = note_path.read_text(encoding="utf-8", errors="replace")
