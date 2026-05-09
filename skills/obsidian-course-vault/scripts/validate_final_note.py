@@ -28,6 +28,66 @@ GENERIC_BOILERPLATE_PATTERNS = [
     "先提出对象，再写公式，最后说明为什么",
 ]
 
+TIMELINE_MARKER_RE = re.compile(r"时间参考：约\s*`?([^`\n]+?)`?(?:\n|$)")
+TIMESTAMP_RANGE_RE = re.compile(r"^\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–]\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*$")
+MINIMUM_MAJOR_SECTION_SECONDS = 120
+
+
+def parse_lesson_timestamp(value: str) -> int | None:
+    parts = value.strip().split(":")
+    if len(parts) == 2:
+        minutes, seconds = parts
+        if not minutes.isdigit() or not seconds.isdigit():
+            return None
+        minute_value = int(minutes)
+        second_value = int(seconds)
+        if second_value >= 60:
+            return None
+        return minute_value * 60 + second_value
+    if len(parts) == 3:
+        hours, minutes, seconds = parts
+        if not hours.isdigit() or not minutes.isdigit() or not seconds.isdigit():
+            return None
+        hour_value = int(hours)
+        minute_value = int(minutes)
+        second_value = int(seconds)
+        if minute_value >= 60 or second_value >= 60:
+            return None
+        return hour_value * 3600 + minute_value * 60 + second_value
+    return None
+
+
+def validate_timeline_markers(text: str) -> list[str]:
+    issues: list[str] = []
+    previous_start = -1
+    previous_end = -1
+    for marker in TIMELINE_MARKER_RE.finditer(text):
+        raw_range = marker.group(1).strip()
+        range_match = TIMESTAMP_RANGE_RE.match(raw_range)
+        if not range_match:
+            issues.append(f"timeline marker is not a replay timestamp range: {raw_range}")
+            continue
+        start = parse_lesson_timestamp(range_match.group(1))
+        end = parse_lesson_timestamp(range_match.group(2))
+        if start is None or end is None:
+            issues.append(f"timeline marker has invalid timestamp fields: {raw_range}")
+            continue
+        if end <= start:
+            issues.append(f"timeline range is not increasing: {raw_range}")
+            continue
+        if end - start < MINIMUM_MAJOR_SECTION_SECONDS:
+            issues.append(
+                f"timeline range is too short for a major lesson section: {raw_range}; "
+                "use HH:MM:SS after the first hour"
+            )
+        if previous_start >= 0 and start < previous_start:
+            issues.append(f"timeline range moves backward: {raw_range}")
+        if previous_end >= 0 and end < previous_end:
+            issues.append(f"timeline range end moves backward: {raw_range}")
+        previous_start = start
+        previous_end = end
+    return issues
+
 
 def validate_markdown_text(text: str) -> list[str]:
     issues: list[str] = []
@@ -50,6 +110,8 @@ def validate_markdown_text(text: str) -> list[str]:
     generic_sentence_count = sum(text.count(pattern) for pattern in GENERIC_BOILERPLATE_PATTERNS)
     if generic_sentence_count >= 2:
         issues.append("contains repeated generic advice instead of course-specific reconstruction")
+
+    issues.extend(validate_timeline_markers(text))
 
     return issues
 

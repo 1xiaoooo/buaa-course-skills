@@ -363,7 +363,8 @@ concepts:
     def test_semantic_prompt_requires_time_axis_and_avoids_candidate_lists(self) -> None:
         prompt = MODULE.build_semantic_rebuild_prompt("final-explained")
         self.assertIn("每个分段都必须保留时间轴", prompt)
-        self.assertIn("time_range", prompt)
+        self.assertIn("03:29-18:58", prompt)
+        self.assertIn("超过 1 小时必须写三段式", prompt)
         self.assertIn("面向学生的完成稿", prompt)
         self.assertIn("考试、作业、截止时间", prompt)
         self.assertIn("先判断课程领域", prompt)

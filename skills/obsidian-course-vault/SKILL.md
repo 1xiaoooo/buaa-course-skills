@@ -296,7 +296,7 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 - Never link internal artifacts from public outputs. User-facing placeholder text must also avoid process language such as "agent review", "candidate", or "semantic rebuild".
 - Ensure Obsidian ignores internal workflow paths such as `.course-internal`, `semantic_rebuild`, and `final_note_review` before writing candidate or review artifacts inside a vault.
 - Keep concept links visible in the note body, not only in frontmatter.
-- Keep visible time references in final lesson sections.
+- Keep visible time references in final lesson sections. Time references are a hard gate: write replay-locatable timestamp ranges such as `时间参考：约 \`03:29-18:58\`` or, after the first hour, `时间参考：约 \`01:05:31-01:23:21\``. Never write `01:20-01:39` to mean the 80th to 99th classroom minute; after one hour, use `HH:MM:SS`. Time ranges must be monotone in note order and should be long enough to represent a real major lesson section.
 - Keep math as `$...$` or `$$...$$` only.
 - Keep graph-growth rules internal to the semantic packet. Do not expose helper rule notes as vault content.
 - Keep course pages concept-centric. Lesson pages support the graph; they should not become the graph itself.
