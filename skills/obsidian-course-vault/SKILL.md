@@ -100,9 +100,11 @@ When the user explicitly asks to organize all pending BUAA replays for a course:
 1. Reuse the existing replay extraction directory and semantic packets when present.
 2. Build any missing semantic packets first; do not rerun browser extraction for lessons that already have current `transcript.txt` and `semantic_rebuild_input.json`.
 3. Filter candidates before writing: skip finalized lessons, skip future lessons, and keep missing/empty/near-empty transcripts in waiting/backlog.
-4. For each eligible lesson, read the full transcript, write the formal note, run validation, create the review packet, and record a passing review for the current note hash.
-5. Run `maintain_obsidian_course.py` once after the batch to refresh overview, trackers, backlog, and sync notes. Run it earlier only when you need a checkpoint or need it to create missing directories/packets.
-6. Do not regenerate concept pages from weak transcript-only hints during the batch; defer graph growth to transcript-stable concepts and the normal maintenance pass.
+4. Before writing each lesson, decide the admitted formal concept set from transcript-stable teaching objects and the existing course graph. Existing concept pages may be reused immediately; a genuinely new concept must be accepted for graph growth and have a planned concept page/hub placement before it can appear as a wiki link or `concepts` frontmatter item.
+5. For each eligible lesson, read the full transcript, write the formal note using only the admitted concept set, run validation, create the review packet, and record a passing review for the current note hash.
+6. Materialize admitted new concepts during the same lesson/batch authoring pass, before the note is considered finalized. Do not let a finalized lesson contain concept links that are merely promises to be backfilled later.
+7. Run `maintain_obsidian_course.py` once after the batch to refresh overview, trackers, backlog, and sync notes. Run it earlier only when you need a checkpoint or need it to create missing directories/packets.
+8. Do not regenerate concept pages from weak transcript-only hints during the batch; defer graph growth to transcript-stable concepts and the normal maintenance pass.
 
 This is a batching optimization, not a relaxation of the semantic gates.
 
@@ -112,12 +114,14 @@ For semantic modes:
 
 1. Build the semantic packet from replay artifacts plus recent course context.
 2. Run a course-alignment check before accepting the note.
-3. Rewrite the note semantically.
-4. Run `scripts\validate_final_note.py` on the rewritten Markdown.
-5. Generate a reviewer packet with `scripts\review_final_note.py` into a vault-external work directory.
-6. Run an independent reviewer pass against the current note hash.
-7. Mark the lesson as finished only after semantic rebuild completes, hard gate passes, and reviewer returns `pass`.
-8. Only allow a formal lesson page when transcript coverage and transcript-based summary coverage both pass.
+3. Decide the admitted concept set before drafting prose. Separate existing concept pages, admitted new concepts, and rejected/weak hints.
+4. Materialize admitted new concept pages and connect them to an existing or new hub before using them as wiki links or lesson frontmatter concepts.
+5. Rewrite the note semantically using only admitted concepts.
+6. Run `scripts\validate_final_note.py` on the rewritten Markdown.
+7. Generate a reviewer packet with `scripts\review_final_note.py` into a vault-external work directory.
+8. Run an independent reviewer pass against the current note hash.
+9. Mark the lesson as finished only after semantic rebuild completes, concept admission/materialization is consistent, hard gate passes, and reviewer returns `pass`.
+10. Only allow a formal lesson page when transcript coverage and transcript-based summary coverage both pass.
 
 If semantic rebuild is still pending, do not count the lesson as finished in course trackers.
 
@@ -219,6 +223,9 @@ When writing the formal Obsidian lesson note from a semantic packet:
 - You are writing the finished note, not a seed note, diagnostic note, or instruction to a future organizer.
 - Read the full `transcript.txt` before writing. Use `semantic_rebuild_input.json` only as metadata, time anchors, and artifact index.
 - Do not expose evidence snippets, candidate phrases, OCR fragments, raw ASR lines, or internal workflow notes.
+- Before drafting the note body, form the admitted concept set. A concept may enter `concepts` frontmatter or visible wiki links only if it is already a finished page or it is being materialized as a finished page in the same pass.
+- Reject weak concept hints before writing: section labels, generic nouns, one-off examples, OCR/PPT-only terms, transcript noise, and concepts that cannot be explained from the lesson transcript plus course context.
+- If a useful term is not yet strong enough for a concept page, mention it as plain text in the lesson rather than as a concept wiki link or frontmatter concept.
 - Every major time block should explain what teaching move happened: definition, model, argument, proof, example, comparison, case discussion, policy explanation, teacher comment, assignment, exam arrangement, or class logistics.
 - Capture high-value classroom signals: exams, homework, deadlines, submission format, grading weight, reading requirements, teacher-emphasized key points, repeatedly stressed phrases, formulas, theorems, definitions, examples, and common mistakes.
 - If the teacher explicitly says something is important, likely to be tested, easy to confuse, often wrong, or needs review after class, preserve it in the note.
@@ -302,6 +309,10 @@ Protect lessons already marked as semantic rebuild completions from silent overw
 - Keep course pages concept-centric. Lesson pages support the graph; they should not become the graph itself.
 - Grow concept pages from transcript-stable concepts only. Do not let PPT or OCR noise create concept pages.
 - Do not create concept pages from low-quality transcript snippets, representative expressions, or generic section labels.
+- Treat missing-page checks as a regression guard, not the main workflow. The main workflow is concept admission before authoring: no accepted formal concept may enter a lesson until its concept page either already exists or is being written in the same pass.
+- Before declaring a course batch complete, still run a missing-page check: collect finalized lesson `concepts` plus visible concept wiki links, ignore course trackers/admin pages, and verify each formal concept has a corresponding finished concept page under `02-Concepts/<course>/`.
+- If the check finds missing pages, treat it as a process failure: either remove the weak concept from the lesson or write the course-supported concept card and hub connection before refreshing `章节完成度.md`.
+- Keep concept pages substantive but compact: define the concept in this course's context, link prerequisite/related/contrasting concepts, list lesson references, and include only transcript-supported formulas or examples.
 - Do not add a lesson to course trackers or graph growth if `validate_final_note.py` rejects it.
 
 On Windows, prefer a UTF-8 shell when validating generated files. If needed, set `[Console]::InputEncoding` and `[Console]::OutputEncoding` to UTF-8 before manual `Get-Content` or other console inspection.
